@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ナイトワーク伝票＆レジ締め管理</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        night: {
+                            950: '#090a0f',
+                            900: '#121520',
+                            800: '#1c2030',
+                            700: '#2a3045',
+                            card: '#161926'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            background-color: #090a0f;
+            color: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* スクロールバー非表示 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 💡 ここにFirebaseコンソールからコピーした本物の設定を貼り付けてください
+        const firebaseConfig = {
+  apiKey: "AIzaSyBRags3gsk7Kuly13rM_jsBDZUy3psptco",
+  authDomain: "face-sale-management.firebaseapp.com",
+  databaseURL: "https://face-sale-management-default-rtdb.firebaseio.com",
+  projectId: "face-sale-management",
+  storageBucket: "face-sale-management.firebasestorage.app",
+  messagingSenderId: "140519781819",
+  appId: "1:140519781819:web:88c09eff8dadf01df2809e",
+  measurementId: "G-CT5MV5KVY0"
+};
+
+        const defaultAppId = 'nightwork-register-app';
+        let unsubscribeSnapshot = null;
+
+        window.initFirebaseCloud = async function() {
+            try {
+                if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ここに取得した")) {
+                    console.warn("Firebase config is using placeholder. Realtime sync disabled.");
+                    const statusEl = document.getElementById('cloudSyncStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400">キー未設定(ローカル)</span>';
+                    }
+                    return;
+                }
+
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+
+                // Handle network/offline errors gracefully without crashing
+                try {
+                    await signInAnonymously(auth);
+                } catch (authErr) {
+                    console.warn("Anonymous auth failed (network or offline), operating in offline/local fallback mode:", authErr);
+                    const statusEl = document.getElementById('cloudSyncStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400">オフライン(ローカル動作中)</span>';
+                    }
+                    return;
+                }
+
+                window.db = db;
+                window.isCloudReady = true;
+                
+                window.connectCloudSync();
+            } catch (e) {
+                console.error("Firebase init failed:", e);
+                const statusEl = document.getElementById('cloudSyncStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400">ローカル動作中</span>';
+                }
+            }
+        };
+
+        window.connectCloudSync = function() {
+            if (!window.isCloudReady || !window.db) return;
+            
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+            }
+
+            const storeKey = window.appState?.storeSyncKey || 'nightwork-store-1';
+            const statusEl = document.getElementById('cloudSyncStatus');
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-400">同期中 (${window.escapeHtml(storeKey)})</span>`;
+            }
+
+            const docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
+            
+            unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const cloudData = docSnap.data();
+                    if (cloudData && cloudData.state) {
+                        const currentPin = window.appState?.pinCode;
+                        const currentKey = window.appState?.storeSyncKey;
+                        window.appState = { 
+                            ...window.appState, 
+                            ...cloudData.state,
+                            pinCode: currentPin || cloudData.state.pinCode,
+                            storeSyncKey: currentKey || cloudData.state.storeSyncKey
+                        };
+                        try {
+                            localStorage.setItem('nightwork_app_state', JSON.stringify(window.appState));
+                        } catch (e) {}
+                        if (typeof window.renderAll === 'function') {
+                            window.renderAll();
+                        }
+                    }
+                } else {
+                    // 初回接続時でクラウドにデータがない場合は現在のローカルデータをクラウドへプッシュ
+                    if (typeof window.syncStateToCloud === 'function') {
+                        window.syncStateToCloud();
+                    }
+                }
+            }, (error) => {
+                console.warn("Firestore access error:", error);
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400">ローカル動作中</span>';
+                }
+            });
+        };
+
+        window.syncStateToCloud = async function() {
+            if (!window.isCloudReady || !window.db) return;
+            try {
+                const storeKey = window.appState?.storeSyncKey || 'nightwork-store-1';
+                const docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
+                await setDoc(docRef, {
+                    state: window.appState,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+            } catch (e) {
+                console.error("Cloud sync failed:", e);
+            }
+        };
+    </script>
+</head>
+<body class="bg-night-950 text-gray-100 min-h-screen pb-24 flex flex-col">
+
+    <!-- LOGIN OVERLAY -->
+    <div id="loginOverlay" class="fixed inset-0 z-50 bg-night-950 flex items-center justify-center p-4">
+        <div class="bg-gradient-to-b from-night-900 via-night-card to-night-950 border border-amber-500/30 w-full max-w-xs rounded-3xl p-6 shadow-2xl shadow-amber-500/10 text-center space-y-5">
+            <div class="space-y-2">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-black text-2xl font-extrabold shadow-lg shadow-amber-500/20">
+                    🍸
+                </div>
+                <h2 class="text-lg font-bold text-gray-100">店舗ログイン認証</h2>
+                <p class="text-xs text-gray-400">暗証番号 (PIN) を入力してください</p>
+                <p class="text-[10px] text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg py-1 px-2">初期暗証番号: <span class="font-mono font-bold text-amber-300">1234</span></p>
+            </div>
+            <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                <div class="relative">
+                    <input type="password" id="loginPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700/80 rounded-2xl py-3 text-center text-2xl font-mono tracking-widest text-amber-300 focus:outline-none focus:border-amber-400">
+                </div>
+                <div id="loginErrorMsg" class="text-rose-400 text-xs font-bold hidden">暗証番号が正しくありません</div>
+                <button type="submit" class="w-full bg-gradient-to-r from-amber-500 to-amber-400 text-black font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition-transform">
+                    <i data-lucide="key-round" class="w-4 h-4"></i> ログイン
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-40 bg-night-900/90 backdrop-blur-md border-b border-gray-800/80 px-4 py-3 flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-black font-extrabold shadow-md shadow-amber-500/20">
+                🍸
+            </div>
+            <div>
+                <h1 class="text-sm font-bold text-gray-100 leading-none">レジ締め＆日報管理</h1>
+                <div id="cloudSyncStatus" class="flex items-center gap-1 text-[10px] font-medium mt-0.5 text-gray-400 cursor-pointer" onclick="openSyncKeyModal()">
+                    <span class="w-1.5 h-1.5 rounded-full bg-gray-500"></span> 準備中
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <input type="date" id="currentDateInput" onchange="onDateChange(this.value)" class="bg-night-950 border border-gray-700/80 rounded-xl px-2.5 py-1.5 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400">
+            <button type="button" onclick="openSyncKeyModal()" title="同期キー設定" class="p-1.5 rounded-xl bg-night-800 hover:bg-night-700 text-gray-400 hover:text-amber-300 border border-gray-700/60 transition-colors">
+                <i data-lucide="cloud-cog" class="w-4 h-4"></i>
+            </button>
+            <button type="button" onclick="openPinConfigModal()" title="暗証番号変更" class="p-1.5 rounded-xl bg-night-800 hover:bg-night-700 text-gray-400 hover:text-amber-300 border border-gray-700/60 transition-colors">
+                <i data-lucide="key" class="w-4 h-4"></i>
+            </button>
+            <button type="button" onclick="logout()" title="ログアウト" class="p-1.5 rounded-xl bg-night-800 hover:bg-night-700 text-gray-400 hover:text-amber-300 border border-gray-700/60 transition-colors">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- CONTENT CONTAINERS -->
+    <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+
+        <!-- TAB 1: 伝票一覧 -->
+        <section id="tab-slips" class="space-y-3">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="receipt" class="w-4 h-4 text-amber-400"></i> 本日の伝票一覧
+                </h2>
+                <button type="button" id="addSlipBtn" onclick="openSlipModal()" class="bg-gradient-to-r from-amber-500 to-amber-400 text-black font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-amber-500/20 active:scale-95 transition-transform">
+                    <i data-lucide="plus" class="w-4 h-4"></i> 伝票追加
+                </button>
+            </div>
+            <div id="slipList" class="space-y-2">
+                <!-- JS描画 -->
+            </div>
+        </section>
+
+        <!-- TAB 2: 出入金記録 -->
+        <section id="tab-cash" class="space-y-3 hidden">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="arrow-left-right" class="w-4 h-4 text-amber-400"></i> 本日の出入金記録
+                </h2>
+                <div class="flex gap-2">
+                    <button type="button" onclick="openCashModal('in')" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 active:scale-95 transition-transform">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> 入金
+                    </button>
+                    <button type="button" onclick="openCashModal('out')" class="bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 active:scale-95 transition-transform">
+                        <i data-lucide="minus-circle" class="w-4 h-4"></i> 出金
+                    </button>
+                </div>
+            </div>
+            <div id="cashList" class="space-y-2">
+                <!-- JS描画 -->
+            </div>
+        </section>
+
+        <!-- TAB 3: ボーイ勤務記録 -->
+        <section id="tab-boy" class="space-y-3 hidden">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="user-check" class="w-4 h-4 text-amber-400"></i> ボーイ勤務時間記録
+                </h2>
+                <div class="flex gap-2">
+                    <button type="button" onclick="openAddBoyMasterModal()" class="bg-night-800 hover:bg-night-700 text-amber-300 border border-amber-500/30 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 active:scale-95 transition-transform">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i> ボーイ追加
+                    </button>
+                    <button type="button" onclick="openBoyWorkModal()" class="bg-gradient-to-r from-amber-500 to-amber-400 text-black font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-amber-500/20 active:scale-95 transition-transform">
+                        <i data-lucide="plus" class="w-4 h-4"></i> 勤務追加
+                    </button>
+                </div>
+            </div>
+            <div id="boyWorkLogList" class="space-y-2">
+                <!-- JS描画 -->
+            </div>
+        </section>
+
+        <!-- TAB 4: 集計・日報 -->
+        <section id="tab-summary" class="space-y-4 hidden">
+            <!-- レジ締めアクションヘッダー -->
+            <div class="bg-night-card border border-gray-800/90 rounded-2xl p-4 shadow-xl space-y-3">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <div id="summaryLockIconBg" class="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <i id="summaryLockIcon" data-lucide="unlock" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Status</div>
+                            <div id="summaryLockStatusText" class="text-xs font-bold text-amber-300">未締め (営業中・編集可能)</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="openInitialCashModal()" class="bg-night-800 hover:bg-night-700 active:scale-95 text-amber-300 border border-amber-500/30 text-[11px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 transition-all">
+                        <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> 準備金設定
+                    </button>
+                </div>
+                <button type="button" onclick="toggleSummaryLock()" class="w-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-black font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+                    <i data-lucide="check-circle-2" class="w-4.5 h-4.5"></i>
+                    <span id="summaryLockBtnText">本日のレジ締め完了</span>
+                </button>
+            </div>
+
+            <!-- 数字カードグリッド (売上総額＋現金・カード・売掛内訳) -->
+            <div class="space-y-2.5">
+                <!-- 売上総額 (メインカード) -->
+                <div class="bg-gradient-to-br from-emerald-950/40 via-night-card to-night-900 border border-emerald-500/30 p-4 rounded-2xl shadow-lg relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-bl-full pointer-events-none"></div>
+                    <div class="text-xs font-bold text-gray-300 mb-1 flex items-center gap-1.5">
+                        <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> 本日売上総額
+                    </div>
+                    <div id="summaryTotalSales" class="text-2xl font-mono font-black text-emerald-400">¥0</div>
+                </div>
+
+                <!-- 決済種別ごとの内訳 (3列表示) -->
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="bg-night-card border border-gray-800/90 p-2.5 rounded-xl shadow-md text-center">
+                        <div class="text-[10px] font-bold text-gray-400 mb-0.5">💵 現金売上</div>
+                        <div id="summaryCashSales" class="text-xs font-mono font-extrabold text-emerald-300">¥0</div>
+                    </div>
+                    <div class="bg-night-card border border-gray-800/90 p-2.5 rounded-xl shadow-md text-center">
+                        <div class="text-[10px] font-bold text-gray-400 mb-0.5">💳 カード売上</div>
+                        <div id="summaryCardSales" class="text-xs font-mono font-extrabold text-sky-300">¥0</div>
+                    </div>
+                    <div class="bg-night-card border border-gray-800/90 p-2.5 rounded-xl shadow-md text-center">
+                        <div class="text-[10px] font-bold text-gray-400 mb-0.5">📝 売掛金</div>
+                        <div id="summaryReceivableSales" class="text-xs font-mono font-extrabold text-amber-300">¥0</div>
+                    </div>
+                </div>
+
+                <!-- 準備金・出入金カード (2列表示) -->
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="bg-night-card border border-gray-800/90 p-3 rounded-xl shadow-md">
+                        <div class="text-[10px] font-semibold text-gray-400 mb-1 flex items-center gap-1">
+                            <i data-lucide="safe" class="w-3 h-3 text-amber-300"></i> 準備金
+                        </div>
+                        <div id="summaryInitialCash" class="text-sm font-mono font-extrabold text-amber-300">¥0</div>
+                    </div>
+                    <div class="bg-night-card border border-gray-800/90 p-3 rounded-xl shadow-md">
+                        <div class="text-[10px] font-semibold text-gray-400 mb-1 flex items-center gap-1">
+                            <i data-lucide="arrow-down-left" class="w-3 h-3 text-emerald-400"></i> 入金計
+                        </div>
+                        <div id="summaryCashIn" class="text-sm font-mono font-extrabold text-emerald-400">¥0</div>
+                    </div>
+                    <div class="bg-night-card border border-gray-800/90 p-3 rounded-xl shadow-md">
+                        <div class="text-[10px] font-semibold text-gray-400 mb-1 flex items-center gap-1">
+                            <i data-lucide="arrow-up-right" class="w-3 h-3 text-rose-400"></i> 出金計
+                        </div>
+                        <div id="summaryCashOut" class="text-sm font-mono font-extrabold text-rose-400">¥0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 理論現金表示 -->
+            <div class="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 p-4 rounded-2xl shadow-xl flex justify-between items-center">
+                <div>
+                    <div class="text-xs text-amber-300 font-extrabold flex items-center gap-1.5">
+                        <i data-lucide="wallet" class="w-4 h-4 text-amber-400"></i> ドロアー内理論現金
+                    </div>
+                    <div class="text-[10px] text-gray-400 font-medium mt-0.5">（準備金 + 現金売上 + 入金 - 出金 - バック）</div>
+                </div>
+                <div id="summaryExpectedCash" class="text-2xl font-mono font-black text-amber-400 tracking-tight">¥0</div>
+            </div>
+
+            <!-- シャンパンバック支給内訳カード (個別内訳のみ・支給総額は非表示) -->
+            <div class="bg-night-card border border-gray-800/90 rounded-2xl p-4 shadow-xl space-y-3">
+                <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                        <i data-lucide="award" class="w-4 h-4 text-amber-400"></i> シャンパンバック支給内訳 (10%)
+                    </div>
+                </div>
+                <div id="summaryCastBackList" class="space-y-1.5 text-xs">
+                    <!-- JS描画 -->
+                </div>
+            </div>
+
+            <!-- 出入金詳細確認セクション -->
+            <div class="bg-night-card border border-gray-800/90 rounded-2xl p-4 shadow-xl space-y-3">
+                <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5 border-b border-gray-800 pb-2">
+                    <i data-lucide="arrow-left-right" class="w-4 h-4 text-amber-400"></i> 本日の出入金明細一覧
+                </div>
+                <div id="summaryCashDetailList" class="space-y-2 text-xs max-h-48 overflow-y-auto no-scrollbar">
+                    <!-- JS描画 -->
+                </div>
+            </div>
+
+            <!-- 日報コピーボタン -->
+            <button type="button" onclick="copySummaryToClipboard()" class="w-full bg-night-800 hover:bg-night-700 active:scale-95 border border-gray-700/80 text-gray-200 font-bold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg transition-transform">
+                <i data-lucide="copy" class="w-4 h-4 text-amber-400"></i>
+                <span>日報用テキストをコピー</span>
+            </button>
+        </section>
+
+    </main>
+
+    <!-- FOOTER NAV -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-night-900/95 backdrop-blur-md border-t border-gray-800/80 px-2 py-1 flex justify-around text-[10px]">
+        <button type="button" id="nav-slips" onclick="switchTab('slips')" class="flex-1 py-2 flex flex-col items-center gap-1 text-amber-400 font-bold border-b-2 border-amber-400">
+            <i data-lucide="receipt" class="w-5 h-5"></i>
+            <span>伝票</span>
+        </button>
+        <button type="button" id="nav-cash" onclick="switchTab('cash')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-400 hover:text-gray-200">
+            <i data-lucide="arrow-left-right" class="w-5 h-5"></i>
+            <span>入出金</span>
+        </button>
+        <button type="button" id="nav-boy" onclick="switchTab('boy')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-400 hover:text-gray-200">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+            <span>ボーイ</span>
+        </button>
+        <button type="button" id="nav-summary" onclick="switchTab('summary')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-400 hover:text-gray-200">
+            <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+            <span>集計・日報</span>
+        </button>
+    </nav>
+
+    <!-- MODALS -->
+
+    <!-- Modal 1: 伝票登録 -->
+    <div id="slipModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-all duration-300">
+        <div class="bg-gradient-to-b from-night-900 via-night-card to-night-950 border border-amber-500/30 w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl shadow-amber-500/10 max-h-[90vh] flex flex-col">
+            <!-- モーダルヘッダー -->
+            <div class="bg-night-900/90 px-5 py-3.5 border-b border-gray-800/80 flex justify-between items-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent"></div>
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                        <i data-lucide="receipt" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm text-gray-100 flex items-center gap-1.5">伝票登録 / 編集</h3>
+                        <p class="text-[10px] text-amber-400/70 font-medium">Slip Management</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeSlipModal()" class="w-8 h-8 rounded-full bg-night-800/80 border border-gray-700/60 text-gray-400 hover:text-white flex items-center justify-center transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- モーダル本文 -->
+            <div class="p-5 space-y-4 overflow-y-auto text-xs no-scrollbar">
+                <input type="hidden" id="slipId">
+                
+                <!-- 伝票番号 & 客数 -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-night-950/80 p-2.5 rounded-2xl border border-gray-800 focus-within:border-amber-500/50 transition-colors">
+                        <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
+                            <i data-lucide="hash" class="w-3 h-3 text-amber-400"></i> 伝票番号 <span class="text-rose-400">*</span>
+                        </label>
+                        <input type="text" id="slipNumberInput" placeholder="例: 101" class="w-full bg-transparent text-amber-300 font-mono text-base font-extrabold focus:outline-none placeholder-gray-600">
+                    </div>
+                    <div class="bg-night-950/80 p-2.5 rounded-2xl border border-gray-800 focus-within:border-amber-500/50 transition-colors">
+                        <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
+                            <i data-lucide="users" class="w-3 h-3 text-amber-400"></i> 客数 (名) <span class="text-rose-400">*</span>
+                        </label>
+                        <input type="number" id="customerCountInput" value="1" min="1" class="w-full bg-transparent text-white font-mono text-base font-extrabold focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- 小計 / 総額 -->
+                <div class="bg-gradient-to-br from-emerald-950/30 via-night-950 to-night-950 p-3 rounded-2xl border border-emerald-500/30 focus-within:border-emerald-400/60 transition-colors">
+                    <label class="block text-[10px] text-emerald-400 font-bold mb-1 flex items-center justify-between">
+                        <span class="flex items-center gap-1"><i data-lucide="japanese-yen" class="w-3 h-3"></i> 伝票小計 / 総額</span>
+                        <span class="text-[9px] text-gray-400 font-normal">税込・サービス料込</span>
+                    </label>
+                    <div class="relative flex items-center">
+                        <span class="text-emerald-400 font-mono text-lg font-bold mr-1">¥</span>
+                        <input type="number" id="slipTotalAmountInput" placeholder="0" class="w-full bg-transparent text-emerald-400 font-mono text-xl font-black focus:outline-none placeholder-emerald-900/50">
+                    </div>
+                </div>
+
+                <!-- 支払い内訳 (カード型レイアウト) -->
+                <div class="space-y-2 border-t border-gray-800/80 pt-3">
+                    <label class="block text-gray-300 font-bold text-xs flex items-center gap-1.5">
+                        <i data-lucide="credit-card" class="w-3.5 h-3.5 text-amber-400"></i> 支払い種別内訳
+                    </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-emerald-500/50">
+                            <span class="block text-[10px] font-bold text-emerald-400 mb-0.5">💵 現金</span>
+                            <input type="number" id="cashPaymentInput" placeholder="0" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                        </div>
+                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-sky-500/50">
+                            <span class="block text-[10px] font-bold text-sky-400 mb-0.5">💳 カード</span>
+                            <input type="number" id="cardPaymentInput" placeholder="0" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                        </div>
+                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-amber-500/50">
+                            <span class="block text-[10px] font-bold text-amber-400 mb-0.5">📝 売掛</span>
+                            <input type="number" id="receivablePaymentInput" placeholder="0" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- シャンパン追加セクション (ラグジュアリーデザイン) -->
+                <div class="border-t border-gray-800/80 pt-3 space-y-2.5">
+                    <div class="flex justify-between items-center">
+                        <label class="text-gray-300 font-bold text-xs flex items-center gap-1.5">
+                            <i data-lucide="wine" class="w-3.5 h-3.5 text-amber-400"></i> シャンパン注文 (都度入力)
+                        </label>
+                        <button type="button" onclick="addChampagneRow()" class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[11px] px-2.5 py-1 rounded-xl flex items-center gap-1 active:scale-95 transition-all">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> ボトル追加
+                        </button>
+                    </div>
+                    <div id="champagneListContainer" class="space-y-2.5">
+                        <!-- 動的追加 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- モーダル フッターボタン -->
+            <div class="bg-night-900/90 px-5 py-3.5 border-t border-gray-800/80 flex justify-between items-center gap-2">
+                <button type="button" id="deleteSlipBtn" onclick="deleteSlip()" class="bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-700/50 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 transition-all hidden">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 削除
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeSlipModal()" class="bg-night-800 hover:bg-night-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs transition-colors">
+                        キャンセル
+                    </button>
+                    <button type="button" onclick="saveSlip()" class="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black font-extrabold px-6 py-2 rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-1">
+                        <i data-lucide="check" class="w-4 h-4"></i> 保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1.5: 準備金設定モーダル -->
+    <div id="initialCashModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-night-card border border-gray-800 w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl">
+            <div class="bg-night-900 px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+                <h3 class="font-bold text-sm text-gray-200">準備金（初期釣銭）設定</h3>
+                <button type="button" onclick="closeInitialCashModal()" class="text-gray-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">本日の準備金金額 (円)</label>
+                    <input type="number" id="initialCashInput" placeholder="30000" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
+                </div>
+            </div>
+            <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-end gap-2">
+                <button type="button" onclick="closeInitialCashModal()" class="bg-night-800 hover:bg-night-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs">
+                    キャンセル
+                </button>
+                <button type="button" onclick="saveInitialCash()" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2 rounded-xl text-xs">
+                    設定する
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1.8: 暗証番号 (PIN) 変更モーダル -->
+    <div id="pinConfigModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-night-card border border-amber-500/30 w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl">
+            <div class="bg-night-900 px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+                <h3 class="font-bold text-sm text-gray-200 flex items-center gap-1.5">
+                    <i data-lucide="key" class="w-4 h-4 text-amber-400"></i> 暗証番号 (PIN) 変更
+                </h3>
+                <button type="button" onclick="closePinConfigModal()" class="text-gray-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3 text-xs">
+                <div>
+                    <label class="block text-gray-400 mb-1">現在の暗証番号</label>
+                    <input type="password" id="currentPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="block text-gray-400 mb-1">新しい暗証番号 (数字のみ)</label>
+                    <input type="password" id="newPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="block text-gray-400 mb-1">新しい暗証番号 (確認再入力)</label>
+                    <input type="password" id="confirmPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
+                </div>
+            </div>
+            <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-end gap-2">
+                <button type="button" onclick="closePinConfigModal()" class="bg-night-800 hover:bg-night-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs">
+                    キャンセル
+                </button>
+                <button type="button" onclick="saveNewPin()" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2 rounded-xl text-xs">
+                    変更を保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1.9: 店舗共有同期キー設定モーダル -->
+    <div id="syncKeyModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-night-card border border-emerald-500/30 w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl">
+            <div class="bg-night-900 px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+                <h3 class="font-bold text-sm text-gray-200 flex items-center gap-1.5">
+                    <i data-lucide="cloud" class="w-4 h-4 text-emerald-400"></i> 店舗同期キー設定
+                </h3>
+                <button type="button" onclick="closeSyncKeyModal()" class="text-gray-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3 text-xs">
+                <p class="text-gray-400 text-[11px]">他のスマホや端末とデータをリアルタイム共有する場合、同じ「同期キー（例: store123）」を設定してください。</p>
+                <div>
+                    <label class="block text-gray-300 font-bold mb-1">同期キー / 店舗コード</label>
+                    <input type="text" id="syncKeyInput" placeholder="例: club-club-777" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-emerald-300 font-mono text-sm font-bold focus:outline-none focus:border-emerald-400">
+                </div>
+            </div>
+            <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-end gap-2">
+                <button type="button" onclick="closeSyncKeyModal()" class="bg-night-800 hover:bg-night-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs">
+                    キャンセル
+                </button>
+                <button type="button" onclick="saveSyncKey()" class="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-5 py-2 rounded-xl text-xs">
+                    同期キーを保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: 出入金登録 -->
+    <div id="cashModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-night-card border border-gray-800 w-full max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl">
+            <div class="bg-night-900 px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+                <h3 id="cashModalTitle" class="font-bold text-sm text-gray-200">出入金登録</h3>
+                <button type="button" onclick="closeCashModal()" class="text-gray-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3 text-xs">
+                <input type="hidden" id="cashIdInput">
+                <input type="hidden" id="cashTypeInput" value="out">
+                
+                <div>
+                    <label class="block text-gray-400 mb-1">区分</label>
+                    <select id="cashCategorySelect" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-bold">
+                        <!-- JSで動的に追加 -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 mb-1">金額 (円) <span class="text-rose-400">*</span></label>
+                    <input type="number" id="cashAmountInput" placeholder="0" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div>
+                    <label class="block text-gray-400 mb-1">メモ / 内容</label>
+                    <input type="text" id="cashMemoInput" placeholder="例: ○○店タクシー代" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-white">
+                </div>
+            </div>
+            <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-between gap-2">
+                <button type="button" id="deleteCashBtn" onclick="deleteCashTransaction()" class="bg-rose-900/50 hover:bg-rose-800 text-rose-200 border border-rose-700/50 font-bold px-3 py-2 rounded-xl text-xs hidden">
+                    削除
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeCashModal()" class="bg-night-800 hover:bg-night-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs">
+                        キャンセル
+                    </button>
+                    <button type="button" onclick="saveCashTransaction()" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2 rounded-xl text-xs">
+                        保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 5: ボーイ新規追加用モーダル -->
+    <div id="addBoyModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-night-card border border-gray-800 w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl">
+            <div class="bg-night-900 px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+                <h3 class="font-bold text-sm text-gray-200">ボーイ追加</h3>
+                <button type="button" onclick="closeAddBoyMasterModal()" class="text-gray-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">ボーイのお名前</label>
+                    <input type="text" id="newBoyNameInput" placeholder="例: リュウジ" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-white font-bold focus:outline-none focus:border-amber-400">
+                </div>
+            </div>
+            <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-end gap-2">
+                <button type="button" onclick="closeAddBoyMasterModal()" class="bg-night-800 hover:bg-night-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs">
+                    キャンセル
+                </button>
+                <button type="button" onclick="saveNewBoyMaster()" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2 rounded-xl text-xs">
+                    追加する
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 6: ボーイ勤務登録モーダル (完全修復) -->
+    <div id="boyWorkModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-night-card border border-gray-800 w-full max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl">
+            <div class="bg-night-900 px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+                <h3 class="font-bold text-sm text-gray-200">ボーイ勤務時間登録 / 編集</h3>
+                <button type="button" onclick="closeBoyWorkModal()" class="text-gray-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3 text-xs">
+                <input type="hidden" id="boyWorkId">
+                <div>
+                    <label class="block text-gray-400 mb-1">ボーイ選択 <span class="text-rose-400">*</span></label>
+                    <select id="boySelect" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-bold">
+                        <!-- JSで動的生成 -->
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-gray-400 mb-1">出勤時間 (30分刻み)</label>
+                        <select id="boyStartTime" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-white font-mono font-bold">
+                            <!-- JS生成 -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 mb-1">退勤時間 (30分刻み)</label>
+                        <select id="boyEndTime" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-white font-mono font-bold">
+                            <!-- JS生成 -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-between gap-2">
+                <button type="button" id="deleteBoyWorkBtn" onclick="deleteBoyWorkLog()" class="bg-rose-900/50 hover:bg-rose-800 text-rose-200 border border-rose-700/50 font-bold px-3 py-2 rounded-xl text-xs hidden">
+                    削除
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeBoyWorkModal()" class="bg-night-800 hover:bg-night-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs">
+                        キャンセル
+                    </button>
+                    <button type="button" onclick="saveBoyWorkLog()" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2 rounded-xl text-xs">
+                        保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT -->
+    <script>
+        // --- グローバル状態管理 ---
+        let appState = {
+            currentDate: '',
+            isLocked: false,
+            isLoggedIn: false,
+            pinCode: '1234', // デフォルト暗証番号
+            storeSyncKey: 'nightwork-store-1', // デフォルト同期キー
+            masterBoys: ['アズミ', 'タケ', 'レミ', 'トモヤ', 'シオン', 'イッセイ', 'ハヤタ', 'コウタ', 'アオイ', 'シンノスケ', 'ユウト', 'キョウタロウ'],
+            masterGirls: ['ひな', 'あい', 'りお', 'みゆ', 'さくら', 'えみ', 'ナナ', 'ユイ', 'カレン', 'アスカ'],
+            dailyData: {}
+        };
+        window.appState = appState;
+
+        // ローカルストレージ読み込み
+        function loadAppState() {
+            try {
+                const saved = localStorage.getItem('nightwork_app_state');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    appState = { ...appState, ...parsed };
+                    if (!appState.storeSyncKey) appState.storeSyncKey = 'nightwork-store-1';
+                    window.appState = appState;
+                }
+            } catch (e) {
+                console.error('Failed to load state', e);
+            }
+        }
+
+        // 同期キー設定モーダル操作
+        function openSyncKeyModal() {
+            const modal = document.getElementById('syncKeyModal');
+            const input = document.getElementById('syncKeyInput');
+            if (input) input.value = appState.storeSyncKey || 'nightwork-store-1';
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeSyncKeyModal() {
+            const modal = document.getElementById('syncKeyModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveSyncKey() {
+            const input = document.getElementById('syncKeyInput')?.value?.trim();
+            if (!input) {
+                showToast('同期キーを入力してください');
+                return;
+            }
+            appState.storeSyncKey = input;
+            saveAppState();
+            closeSyncKeyModal();
+
+            if (typeof window.connectCloudSync === 'function') {
+                window.connectCloudSync();
+            }
+            showToast(`同期キー「${input}」に切り替えました`);
+        }
+
+        // 暗証番号変更モーダル操作
+        function openPinConfigModal() {
+            const modal = document.getElementById('pinConfigModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closePinConfigModal() {
+            const modal = document.getElementById('pinConfigModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveNewPin() {
+            const currentPin = document.getElementById('currentPinInput')?.value || '';
+            const newPin = document.getElementById('newPinInput')?.value || '';
+            const confirmPin = document.getElementById('confirmPinInput')?.value || '';
+
+            if (currentPin !== appState.pinCode) {
+                showToast('現在の暗証番号が正しくありません');
+                return;
+            }
+            if (!newPin || newPin.length < 4) {
+                showToast('新しい暗証番号は4文字以上で入力してください');
+                return;
+            }
+            if (newPin !== confirmPin) {
+                showToast('新しい暗証番号が一致しません');
+                return;
+            }
+
+            appState.pinCode = newPin;
+            saveAppState();
+            closePinConfigModal();
+            showToast('暗証番号を変更しました');
+        }
+
+        // ログイン処理
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const inputPin = document.getElementById('loginPinInput')?.value || '';
+            const errorMsg = document.getElementById('loginErrorMsg');
+
+            if (inputPin === appState.pinCode) {
+                appState.isLoggedIn = true;
+                saveAppState();
+                const loginOverlay = document.getElementById('loginOverlay');
+                if (loginOverlay) loginOverlay.classList.add('hidden');
+                if (errorMsg) errorMsg.classList.add('hidden');
+            } else {
+                if (errorMsg) errorMsg.classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            appState.isLoggedIn = false;
+            saveAppState();
+            const loginOverlay = document.getElementById('loginOverlay');
+            if (loginOverlay) loginOverlay.classList.remove('hidden');
+            showToast('ログアウトしました');
+        }
+
+        // ローカルストレージおよびクラウド保存
+        function saveAppState() {
+            try {
+                localStorage.setItem('nightwork_app_state', JSON.stringify(appState));
+                window.appState = appState;
+                if (typeof window.syncStateToCloud === 'function') {
+                    window.syncStateToCloud();
+                }
+            } catch (e) {
+                console.error('Failed to save state', e);
+            }
+        }
+
+        // 本日のデータ取得
+        function getCurrentDayData() {
+            if (!appState.currentDate) return { slips: [], cashTransactions: [], boyWorkLogs: [], initialCash: 0 };
+            if (!appState.dailyData[appState.currentDate]) {
+                appState.dailyData[appState.currentDate] = {
+                    slips: [],
+                    cashTransactions: [],
+                    boyWorkLogs: [],
+                    initialCash: 0
+                };
+            }
+            return appState.dailyData[appState.currentDate];
+        }
+
+        // ID生成
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        window.escapeHtml = escapeHtml;
+
+        // 日付変更時ハンドラ
+        function onDateChange(newDate) {
+            if (!newDate) return;
+            appState.currentDate = newDate;
+            saveAppState();
+            renderAll();
+        }
+
+        // タブ切替
+        function switchTab(tabName) {
+            ['slips', 'cash', 'boy', 'summary'].forEach(t => {
+                const sec = document.getElementById(`tab-${t}`);
+                const btn = document.getElementById(`nav-${t}`);
+                if (sec) sec.classList.toggle('hidden', t !== tabName);
+                if (btn) {
+                    if (t === tabName) {
+                        btn.className = 'flex-1 py-2 flex flex-col items-center gap-1 text-amber-400 font-bold border-b-2 border-amber-400';
+                    } else {
+                        btn.className = 'flex-1 py-2 flex flex-col items-center gap-1 text-gray-400 hover:text-gray-200';
+                    }
+                }
+            });
+        }
+
+        // 30分刻みの時間プルダウン選択肢を生成
+        function populateTimeSelectOptions(selectElement, selectedValue = '20:00') {
+            if (!selectElement) return;
+            selectElement.innerHTML = '';
+            for (let hour = 0; hour < 24; hour++) {
+                for (let min of [0, 30]) {
+                    const hStr = String(hour).padStart(2, '0');
+                    const mStr = String(min).padStart(2, '0');
+                    const timeVal = `${hStr}:${mStr}`;
+                    const opt = document.createElement('option');
+                    opt.value = timeVal;
+                    opt.textContent = timeVal;
+                    if (timeVal === selectedValue) {
+                        opt.selected = true;
+                    }
+                    selectElement.appendChild(opt);
+                }
+            }
+        }
+
+        // 勤務時間計算
+        function calculateWorkHours(start, end) {
+            if (!start || !end) return '0時間00分';
+            try {
+                const [sh, sm] = start.split(':').map(Number);
+                const [eh, em] = end.split(':').map(Number);
+
+                let startMin = sh * 60 + sm;
+                let endMin = eh * 60 + em;
+
+                if (endMin <= startMin) {
+                    endMin += 24 * 60;
+                }
+
+                const diff = endMin - startMin;
+                const hours = Math.floor(diff / 60);
+                const mins = diff % 60;
+
+                return `${hours}時間${String(mins).padStart(2, '0')}分`;
+            } catch (e) {
+                return '0時間00分';
+            }
+        }
+
+        // ロックUI状態切替
+        function updateLockUI() {
+            const addSlipBtn = document.getElementById('addSlipBtn');
+            const summaryLockIcon = document.getElementById('summaryLockIcon');
+            const summaryLockIconBg = document.getElementById('summaryLockIconBg');
+            const summaryLockStatusText = document.getElementById('summaryLockStatusText');
+            const summaryLockBtnText = document.getElementById('summaryLockBtnText');
+
+            if (summaryLockIcon) {
+                summaryLockIcon.setAttribute('data-lucide', appState.isLocked ? 'lock' : 'unlock');
+            }
+
+            if (appState.isLocked) {
+                if (summaryLockIconBg) summaryLockIconBg.className = 'p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                if (summaryLockStatusText) {
+                    summaryLockStatusText.textContent = 'レジ締め完了 (ロック中)';
+                    summaryLockStatusText.className = 'text-xs font-bold text-emerald-400';
+                }
+                if (summaryLockBtnText) summaryLockBtnText.textContent = 'ロック解除';
+                if (addSlipBtn) addSlipBtn.classList.add('opacity-50', 'pointer-events-none');
+            } else {
+                if (summaryLockIconBg) summaryLockIconBg.className = 'p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20';
+                if (summaryLockStatusText) {
+                    summaryLockStatusText.textContent = '未締め (営業中・編集可能)';
+                    summaryLockStatusText.className = 'text-xs font-bold text-amber-300';
+                }
+                if (summaryLockBtnText) summaryLockBtnText.textContent = '本日のレジ締め完了';
+                if (addSlipBtn) addSlipBtn.classList.remove('opacity-50', 'pointer-events-none');
+            }
+
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+        }
+
+        function toggleSummaryLock() {
+            appState.isLocked = !appState.isLocked;
+            saveAppState();
+            updateLockUI();
+            showToast(appState.isLocked ? '本日分のレジ締めを完了しました' : 'レジ締めロックを解除しました');
+        }
+
+        // --- 準備金（初期金額）モーダル操作 ---
+        function openInitialCashModal() {
+            const modal = document.getElementById('initialCashModal');
+            const input = document.getElementById('initialCashInput');
+            if (!modal || !input) return;
+
+            const dayData = getCurrentDayData();
+            input.value = dayData.initialCash || 0;
+            modal.classList.remove('hidden');
+        }
+
+        function closeInitialCashModal() {
+            const modal = document.getElementById('initialCashModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveInitialCash() {
+            const input = document.getElementById('initialCashInput');
+            if (!input) return;
+
+            const val = parseInt(input.value, 10) || 0;
+            const dayData = getCurrentDayData();
+            dayData.initialCash = val;
+
+            saveAppState();
+            closeInitialCashModal();
+            renderSummary();
+            showToast(`準備金を ¥${val.toLocaleString()} に設定しました`);
+        }
+
+        // --- 伝票（Slip）モーダル操作 ---
+        let currentChampagneItems = [];
+
+        function openSlipModal(slipId = null) {
+            if (appState.isLocked) {
+                showToast('レジ締め完了後のため伝票編集はできません');
+                return;
+            }
+            const modal = document.getElementById('slipModal');
+            const deleteBtn = document.getElementById('deleteSlipBtn');
+            if (!modal) return;
+
+            const dayData = getCurrentDayData();
+
+            if (slipId) {
+                const slip = (dayData.slips || []).find(s => s.id === slipId);
+                if (slip) {
+                    const slipIdEl = document.getElementById('slipId');
+                    const slipNumEl = document.getElementById('slipNumberInput');
+                    const custCountEl = document.getElementById('customerCountInput');
+                    const totalAmtEl = document.getElementById('slipTotalAmountInput');
+                    const cashPayEl = document.getElementById('cashPaymentInput');
+                    const cardPayEl = document.getElementById('cardPaymentInput');
+                    const recvPayEl = document.getElementById('receivablePaymentInput');
+
+                    if (slipIdEl) slipIdEl.value = slip.id;
+                    if (slipNumEl) slipNumEl.value = slip.slipNumber || '';
+                    if (custCountEl) custCountEl.value = slip.customerCount || 1;
+                    if (totalAmtEl) totalAmtEl.value = slip.totalAmount || 0;
+                    if (cashPayEl) cashPayEl.value = slip.cashPayment || 0;
+                    if (cardPayEl) cardPayEl.value = slip.cardPayment || 0;
+                    if (recvPayEl) recvPayEl.value = slip.receivablePayment || 0;
+
+                    currentChampagneItems = slip.champagnes ? [...slip.champagnes] : [];
+                    if (deleteBtn) deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                const slipIdEl = document.getElementById('slipId');
+                const slipNumEl = document.getElementById('slipNumberInput');
+                const custCountEl = document.getElementById('customerCountInput');
+                const totalAmtEl = document.getElementById('slipTotalAmountInput');
+                const cashPayEl = document.getElementById('cashPaymentInput');
+                const cardPayEl = document.getElementById('cardPaymentInput');
+                const recvPayEl = document.getElementById('receivablePaymentInput');
+
+                if (slipIdEl) slipIdEl.value = '';
+                if (slipNumEl) slipNumEl.value = (dayData.slips ? dayData.slips.length + 101 : 101).toString();
+                if (custCountEl) custCountEl.value = 1;
+                if (totalAmtEl) totalAmtEl.value = '';
+                if (cashPayEl) cashPayEl.value = '';
+                if (cardPayEl) cardPayEl.value = '';
+                if (recvPayEl) recvPayEl.value = '';
+
+                currentChampagneItems = [];
+                if (deleteBtn) deleteBtn.classList.add('hidden');
+            }
+
+            renderChampagneRows();
+            modal.classList.remove('hidden');
+        }
+
+        // シャンパン行追加
+        function addChampagneRow() {
+            currentChampagneItems.push({
+                castName: '',
+                brandName: '',
+                price: 0,
+                backRate: 0.1 // 確実に10%バック
+            });
+            renderChampagneRows();
+        }
+
+        function removeChampagneRow(index) {
+            currentChampagneItems.splice(index, 1);
+            renderChampagneRows();
+        }
+
+        // 伝票登録モーダルを閉じる
+        function closeSlipModal() {
+            const modal = document.getElementById('slipModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function renderChampagneRows() {
+            const container = document.getElementById('champagneListContainer');
+            if (!container) return;
+
+            if (currentChampagneItems.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 text-[11px] py-3 bg-night-950/50 rounded-2xl border border-dashed border-gray-800">シャンパン注文はありません</div>';
+                return;
+            }
+
+            container.innerHTML = currentChampagneItems.map((item, idx) => `
+                <div class="bg-gradient-to-br from-night-950 via-night-900 to-night-950 p-3 rounded-2xl border border-amber-500/20 shadow-md space-y-2 relative overflow-hidden">
+                    <div class="flex justify-between items-center border-b border-gray-800/60 pb-1.5">
+                        <span class="text-xs font-bold text-amber-300 flex items-center gap-1">
+                            🍾 ボトル #${idx + 1} <span class="text-[9px] bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded text-amber-400 font-mono">バック10%</span>
+                        </span>
+                        <button type="button" onclick="removeChampagneRow(${idx})" class="text-rose-400 hover:text-rose-300 text-[11px] font-bold flex items-center gap-0.5 transition-colors">
+                            <i data-lucide="trash" class="w-3 h-3"></i> 削除
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[9px] text-gray-400 font-medium mb-0.5">担当キャスト (手入力)</label>
+                            <input type="text" value="${escapeHtml(item.castName || '')}" placeholder="例: ひな" oninput="currentChampagneItems[${idx}].castName = this.value" class="w-full bg-night-950 border border-gray-700/80 focus:border-amber-400 text-amber-300 rounded-xl p-2 text-xs font-bold focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-gray-400 font-medium mb-0.5">銘柄名 (手入力)</label>
+                            <input type="text" value="${escapeHtml(item.brandName || '')}" placeholder="例: ドンペリ白" oninput="currentChampagneItems[${idx}].brandName = this.value" class="w-full bg-night-950 border border-gray-700/80 focus:border-amber-400 text-white rounded-xl p-2 text-xs font-bold focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-gray-400 font-medium mb-0.5">金額 (円)</label>
+                        <input type="number" value="${item.price || 0}" placeholder="0" oninput="currentChampagneItems[${idx}].price = parseInt(this.value, 10) || 0; currentChampagneItems[${idx}].backRate = 0.1;" class="w-full bg-night-950 border border-gray-700/80 focus:border-emerald-400 text-emerald-400 font-mono text-sm font-extrabold rounded-xl p-2 focus:outline-none">
+                    </div>
+                </div>
+            `).join('');
+
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+        }
+
+        function saveSlip() {
+            const slipId = document.getElementById('slipId')?.value || '';
+            const slipNumber = document.getElementById('slipNumberInput')?.value || '';
+            const customerCount = parseInt(document.getElementById('customerCountInput')?.value, 10) || 1;
+            const totalAmount = parseInt(document.getElementById('slipTotalAmountInput')?.value, 10) || 0;
+            const cashPayment = parseInt(document.getElementById('cashPaymentInput')?.value, 10) || 0;
+            const cardPayment = parseInt(document.getElementById('cardPaymentInput')?.value, 10) || 0;
+            const receivablePayment = parseInt(document.getElementById('receivablePaymentInput')?.value, 10) || 0;
+
+            if (!slipNumber) {
+                showToast('伝票番号を入力してください');
+                return;
+            }
+
+            const dayData = getCurrentDayData();
+            if (!dayData.slips) dayData.slips = [];
+
+            // 各シャンパンのバック率を必ず10%に設定
+            const processedChampagnes = (currentChampagneItems || []).map(c => ({
+                ...c,
+                backRate: 0.1
+            }));
+
+            const slipData = {
+                id: slipId || generateId(),
+                slipNumber,
+                customerCount,
+                totalAmount,
+                cashPayment,
+                cardPayment,
+                receivablePayment,
+                champagnes: processedChampagnes
+            };
+
+            if (slipId) {
+                const idx = dayData.slips.findIndex(s => s.id === slipId);
+                if (idx !== -1) dayData.slips[idx] = slipData;
+            } else {
+                dayData.slips.push(slipData);
+            }
+
+            saveAppState();
+            closeSlipModal();
+            renderAll();
+            showToast('伝票を保存しました');
+        }
+
+        function deleteSlip() {
+            const slipId = document.getElementById('slipId')?.value || '';
+            if (!slipId) return;
+
+            const dayData = getCurrentDayData();
+            dayData.slips = (dayData.slips || []).filter(s => s.id !== slipId);
+
+            saveAppState();
+            closeSlipModal();
+            renderAll();
+            showToast('伝票を削除しました');
+        }
+
+        // --- 出入金（Cash Transaction）モーダル操作 ---
+        function openCashModal(type = 'out', txId = null) {
+            if (appState.isLocked) {
+                showToast('レジ締め完了後のため操作できません');
+                return;
+            }
+            const modal = document.getElementById('cashModal');
+            const deleteBtn = document.getElementById('deleteCashBtn');
+            const modalTitle = document.getElementById('cashModalTitle');
+            if (!modal) return;
+
+            const cashIdEl = document.getElementById('cashIdInput');
+            const cashTypeEl = document.getElementById('cashTypeInput');
+            const cashAmtEl = document.getElementById('cashAmountInput');
+            const cashMemoEl = document.getElementById('cashMemoInput');
+            const dayData = getCurrentDayData();
+
+            if (txId) {
+                const tx = (dayData.cashTransactions || []).find(t => t.id === txId);
+                if (tx) {
+                    if (cashIdEl) cashIdEl.value = tx.id;
+                    if (cashTypeEl) cashTypeEl.value = tx.type;
+                    updateCashCategoryOptions(tx.type);
+                    
+                    const catSelect = document.getElementById('cashCategorySelect');
+                    if (catSelect) catSelect.value = tx.category || '';
+
+                    if (cashAmtEl) cashAmtEl.value = tx.amount || '';
+                    if (cashMemoEl) cashMemoEl.value = tx.memo || '';
+
+                    if (modalTitle) modalTitle.textContent = tx.type === 'in' ? '入金記録の編集' : '出金記録の編集';
+                    if (deleteBtn) deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                if (cashIdEl) cashIdEl.value = '';
+                if (cashTypeEl) cashTypeEl.value = type;
+                updateCashCategoryOptions(type);
+
+                if (cashAmtEl) cashAmtEl.value = '';
+                if (cashMemoEl) cashMemoEl.value = '';
+
+                if (modalTitle) modalTitle.textContent = type === 'in' ? '入金登録' : '出金登録';
+                if (deleteBtn) deleteBtn.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function updateCashCategoryOptions(type) {
+            const catSelect = document.getElementById('cashCategorySelect');
+            if (!catSelect) return;
+
+            catSelect.innerHTML = '';
+            const categories = type === 'in' ? ['売掛金', '小口'] : ['日払い', 'ボーイバック', '送り', '外注', 'その他'];
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                catSelect.appendChild(opt);
+            });
+        }
+
+        function closeCashModal() {
+            const modal = document.getElementById('cashModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveCashTransaction() {
+            const txId = document.getElementById('cashIdInput')?.value || '';
+            const type = document.getElementById('cashTypeInput')?.value || 'out';
+            const category = document.getElementById('cashCategorySelect')?.value || 'その他';
+            const amount = parseInt(document.getElementById('cashAmountInput')?.value, 10) || 0;
+            const memo = document.getElementById('cashMemoInput')?.value || '';
+
+            if (amount <= 0) {
+                showToast('金額を入力してください');
+                return;
+            }
+
+            const dayData = getCurrentDayData();
+            if (!dayData.cashTransactions) dayData.cashTransactions = [];
+
+            if (txId) {
+                const idx = dayData.cashTransactions.findIndex(t => t.id === txId);
+                if (idx !== -1) {
+                    dayData.cashTransactions[idx] = { id: txId, type, category, amount, memo };
+                }
+            } else {
+                dayData.cashTransactions.push({
+                    id: generateId(),
+                    type,
+                    category,
+                    amount,
+                    memo
+                });
+            }
+
+            saveAppState();
+            closeCashModal();
+            renderAll();
+            showToast('出入金記録を保存しました');
+        }
+
+        function deleteCashTransaction() {
+            const txId = document.getElementById('cashIdInput')?.value || '';
+            if (!txId) return;
+
+            const dayData = getCurrentDayData();
+            dayData.cashTransactions = (dayData.cashTransactions || []).filter(s => s.id !== txId);
+
+            saveAppState();
+            closeCashModal();
+            renderAll();
+            showToast('出入金記録を削除しました');
+        }
+
+        // --- ボーイ管理 ---
+        function openAddBoyMasterModal() {
+            const modal = document.getElementById('addBoyModal');
+            const input = document.getElementById('newBoyNameInput');
+            if (input) input.value = '';
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeAddBoyMasterModal() {
+            const modal = document.getElementById('addBoyModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveNewBoyMaster() {
+            const input = document.getElementById('newBoyNameInput');
+            if (!input || !input.value.trim()) {
+                showToast('ボーイ名を入力してください');
+                return;
+            }
+            const newName = input.value.trim();
+            if (!appState.masterBoys.includes(newName)) {
+                appState.masterBoys.push(newName);
+                saveAppState();
+            }
+            closeAddBoyMasterModal();
+            openBoyWorkModal();
+            showToast(`ボーイ「${newName}」を追加しました`);
+        }
+
+        function openBoyWorkModal(logId = null) {
+            const modal = document.getElementById('boyWorkModal');
+            const select = document.getElementById('boySelect');
+            const startSelect = document.getElementById('boyStartTime');
+            const endSelect = document.getElementById('boyEndTime');
+            const deleteBtn = document.getElementById('deleteBoyWorkBtn');
+            if (!modal || !select) return;
+
+            const masterBoys = appState.masterBoys || [];
+            select.innerHTML = masterBoys.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+
+            const dayData = getCurrentDayData();
+            if (logId) {
+                const log = (dayData.boyWorkLogs || []).find(l => l.id === logId);
+                if (log) {
+                    const boyWorkIdEl = document.getElementById('boyWorkId');
+                    if (boyWorkIdEl) boyWorkIdEl.value = log.id;
+                    select.value = log.name;
+
+                    if (startSelect) populateTimeSelectOptions(startSelect, log.startTime || '20:00');
+                    if (endSelect) populateTimeSelectOptions(endSelect, log.endTime || '05:00');
+
+                    if (deleteBtn) deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                const boyWorkIdEl = document.getElementById('boyWorkId');
+                if (boyWorkIdEl) boyWorkIdEl.value = '';
+
+                if (startSelect) populateTimeSelectOptions(startSelect, '20:00');
+                if (endSelect) populateTimeSelectOptions(endSelect, '05:00');
+
+                if (deleteBtn) deleteBtn.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeBoyWorkModal() {
+            const modal = document.getElementById('boyWorkModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveBoyWorkLog() {
+            const logIdEl = document.getElementById('boyWorkId');
+            const selectEl = document.getElementById('boySelect');
+            const startEl = document.getElementById('boyStartTime');
+            const endEl = document.getElementById('boyEndTime');
+
+            if (!selectEl || !selectEl.value) {
+                showToast('ボーイを選択してください');
+                return;
+            }
+
+            const logId = logIdEl ? logIdEl.value : '';
+            const name = selectEl.value;
+            const startTime = startEl ? startEl.value : '20:00';
+            const endTime = endEl ? endEl.value : '05:00';
+
+            const dayData = getCurrentDayData();
+            if (!dayData.boyWorkLogs) dayData.boyWorkLogs = [];
+
+            if (logId) {
+                const idx = dayData.boyWorkLogs.findIndex(l => l.id === logId);
+                if (idx !== -1) {
+                    dayData.boyWorkLogs[idx] = { id: logId, name, startTime, endTime };
+                }
+            } else {
+                dayData.boyWorkLogs.push({
+                    id: generateId(),
+                    name,
+                    startTime,
+                    endTime
+                });
+            }
+
+            saveAppState();
+            closeBoyWorkModal();
+            renderBoyLogs();
+            showToast('勤務記録を保存しました');
+        }
+
+        function deleteBoyWorkLog() {
+            const logIdEl = document.getElementById('boyWorkId');
+            const logId = logIdEl ? logIdEl.value : '';
+            if (!logId) return;
+
+            const dayData = getCurrentDayData();
+            dayData.boyWorkLogs = (dayData.boyWorkLogs || []).filter(l => l.id !== logId);
+
+            saveAppState();
+            closeBoyWorkModal();
+            renderBoyLogs();
+            showToast('勤務記録を削除しました');
+        }
+
+        function renderBoyLogs() {
+            const container = document.getElementById('boyWorkLogList');
+            if (!container) return;
+
+            const dayData = getCurrentDayData();
+            const logs = dayData.boyWorkLogs || [];
+
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500 text-xs">
+                        本日の勤務記録はまだありません
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const duration = calculateWorkHours(log.startTime, log.endTime);
+                return `
+                    <div class="bg-night-card border border-gray-800/80 rounded-xl p-3 flex justify-between items-center hover:border-amber-500/30 transition-all cursor-pointer" onclick="openBoyWorkModal('${log.id}')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs">
+                                ${escapeHtml(log.name.charAt(0))}
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm text-gray-200">${escapeHtml(log.name)}</div>
+                                <div class="text-xs text-gray-400 font-mono">${escapeHtml(log.startTime || '20:00')} ～ ${escapeHtml(log.endTime || '05:00')}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="inline-block px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono text-xs font-bold">
+                                ${duration}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- 伝票・現金・集計描画 ---
+        function renderSlips() {
+            const container = document.getElementById('slipList');
+            if (!container) return;
+            const dayData = getCurrentDayData();
+            const slips = dayData.slips || [];
+
+            if (slips.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-night-card border border-gray-800/80 rounded-2xl p-8 text-center text-gray-500 text-xs">
+                        <i data-lucide="receipt" class="w-8 h-8 text-gray-600 mx-auto mb-2 opacity-50"></i>
+                        本日の伝票はまだありません
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = slips.map(s => {
+                const champagnesCount = (s.champagnes || []).length;
+                return `
+                    <div class="bg-night-card border border-gray-800/90 rounded-2xl p-3.5 flex justify-between items-center cursor-pointer hover:border-amber-500/40 active:scale-[0.98] transition-all shadow-md" onclick="openSlipModal('${s.id}')">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-lg text-xs font-mono font-extrabold">
+                                    #${escapeHtml(s.slipNumber || '')}
+                                </span>
+                                <span class="text-xs text-gray-300 font-medium">👥 ${escapeHtml(s.customerCount || 1)}名</span>
+                                ${champagnesCount > 0 ? `<span class="bg-rose-500/10 text-rose-300 border border-rose-500/20 text-[10px] px-1.5 py-0.5 rounded-md font-bold">🍾 ${champagnesCount}</span>` : ''}
+                            </div>
+                            <div class="text-[11px] text-gray-400">
+                                現金: ¥${Number(s.cashPayment || 0).toLocaleString()} / カード: ¥${Number(s.cardPayment || 0).toLocaleString()} / 売掛: ¥${Number(s.receivablePayment || 0).toLocaleString()}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-mono font-black text-emerald-400 text-base">¥${Number(s.totalAmount || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderCashTransactions() {
+            const container = document.getElementById('cashList');
+            if (!container) return;
+            const dayData = getCurrentDayData();
+            const txs = dayData.cashTransactions || [];
+
+            if (txs.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-night-card border border-gray-800/80 rounded-2xl p-8 text-center text-gray-500 text-xs">
+                        <i data-lucide="arrow-left-right" class="w-8 h-8 text-gray-600 mx-auto mb-2 opacity-50"></i>
+                        出入金記録はまだありません
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = txs.map(t => `
+                <div class="bg-night-card border border-gray-800/90 rounded-2xl p-3.5 flex justify-between items-center shadow-md cursor-pointer hover:border-amber-500/40 active:scale-[0.98] transition-all" onclick="openCashModal('${t.type}', '${t.id}')">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 rounded-xl ${t.type === 'in' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
+                            <i data-lucide="${t.type === 'in' ? 'arrow-down-left' : 'arrow-up-right'}" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-xs ${t.type === 'in' ? 'text-emerald-300' : 'text-rose-300'}">[${t.type === 'in' ? '入金' : '出金'}:${escapeHtml(t.category || 'その他')}]</span>
+                            </div>
+                            ${t.memo ? `<div class="text-[11px] text-gray-400 mt-0.5">${escapeHtml(t.memo)}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="font-mono font-extrabold text-sm ${t.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}">
+                        ${t.type === 'in' ? '+' : '-'}¥${Number(t.amount || 0).toLocaleString()}
+                    </div>
+                </div>
+            `).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderSummary() {
+            const dayData = getCurrentDayData();
+            const slips = dayData.slips || [];
+            const cashTxs = dayData.cashTransactions || [];
+
+            let totalSales = 0;
+            let totalCashSales = 0; 
+            let totalCardSales = 0;
+            let totalReceivableSales = 0;
+
+            slips.forEach(s => {
+                totalSales += Number(s.totalAmount || 0);
+                totalCashSales += Number(s.cashPayment || 0); 
+                totalCardSales += Number(s.cardPayment || 0);
+                totalReceivableSales += Number(s.receivablePayment || 0);
+            });
+
+            let cashIn = 0;
+            let cashOut = 0;
+            cashTxs.forEach(t => {
+                if (t.type === 'in') cashIn += Number(t.amount || 0);
+                if (t.type === 'out') cashOut += Number(t.amount || 0);
+            });
+
+            // キャスト別シャンパンバック計算 (10%) - expectedCashの計算前に実行
+            let totalChampagneBack = 0;
+            const castBackMap = {};
+            const castChampagneDetails = {}; // キャストごとの注文内訳
+
+            slips.forEach(s => {
+                (s.champagnes || []).forEach(c => {
+                    const cast = c.castName || 'フリー';
+                    const price = Number(c.price) || 0;
+                    const back = Math.floor(price * 0.1);
+                    totalChampagneBack += back;
+                    castBackMap[cast] = (castBackMap[cast] || 0) + back;
+
+                    if (!castChampagneDetails[cast]) castChampagneDetails[cast] = [];
+                    castChampagneDetails[cast].push({
+                        brand: c.brandName || 'シャンパン',
+                        price: price,
+                        back: back,
+                        slipNum: s.slipNumber
+                    });
+                });
+            });
+
+            const initialCash = dayData.initialCash || 0;
+            const expectedCash = initialCash + totalCashSales + cashIn - cashOut - totalChampagneBack;
+
+            // UI反映
+            const totalSalesEl = document.getElementById('summaryTotalSales');
+            if (totalSalesEl) totalSalesEl.textContent = `¥${totalSales.toLocaleString()}`;
+
+            const cashSalesEl = document.getElementById('summaryCashSales');
+            if (cashSalesEl) cashSalesEl.textContent = `¥${totalCashSales.toLocaleString()}`;
+
+            const cardSalesEl = document.getElementById('summaryCardSales');
+            if (cardSalesEl) cardSalesEl.textContent = `¥${totalCardSales.toLocaleString()}`;
+
+            const recvSalesEl = document.getElementById('summaryReceivableSales');
+            if (recvSalesEl) recvSalesEl.textContent = `¥${totalReceivableSales.toLocaleString()}`;
+
+            const cashInEl = document.getElementById('summaryCashIn');
+            if (cashInEl) cashInEl.textContent = `¥${(cashIn + totalCashSales).toLocaleString()}`;
+
+            const cashOutEl = document.getElementById('summaryCashOut');
+            if (cashOutEl) cashOutEl.textContent = `¥${cashOut.toLocaleString()}`;
+
+            const initialCashEl = document.getElementById('summaryInitialCash');
+            if (initialCashEl) initialCashEl.textContent = `¥${initialCash.toLocaleString()}`;
+
+            const expectedCashEl = document.getElementById('summaryExpectedCash');
+            if (expectedCashEl) expectedCashEl.textContent = `¥${expectedCash.toLocaleString()}`;
+
+            // キャスト別シャンパンバック詳細
+            const castBackListEl = document.getElementById('summaryCastBackList');
+            if (castBackListEl) {
+                const entries = Object.entries(castBackMap);
+                if (entries.length === 0) {
+                    castBackListEl.innerHTML = '<div class="text-gray-500 text-xs py-1">本日のシャンパンバック該当者はありません</div>';
+                } else {
+                    castBackListEl.innerHTML = entries.map(([cast, amt]) => {
+                        const details = castChampagneDetails[cast] || [];
+                        const detailStr = details.map(d => `${d.brand}(¥${d.price.toLocaleString()} → バック¥${d.back.toLocaleString()})`).join(', ');
+                        return `
+                            <div class="bg-night-950 p-2.5 rounded-xl border border-gray-800 space-y-1">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-gray-200">✨ ${escapeHtml(cast)}</span>
+                                    <span class="font-mono font-extrabold text-amber-400">¥${amt.toLocaleString()}</span>
+                                </div>
+                                <div class="text-[10px] text-gray-400">内訳: ${escapeHtml(detailStr)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // 出入金詳細一覧
+            const cashDetailListEl = document.getElementById('summaryCashDetailList');
+            if (cashDetailListEl) {
+                let allDetailItems = [];
+                if (totalCashSales > 0) {
+                    allDetailItems.push({ type: 'in', category: '現金売上', memo: '伝票からの現金合算', amount: totalCashSales });
+                }
+                cashTxs.forEach(t => allDetailItems.push(t));
+
+                if (allDetailItems.length === 0) {
+                    cashDetailListEl.innerHTML = '<div class="text-gray-500 text-xs py-1 text-center">本日の出入金記録はありません</div>';
+                } else {
+                    cashDetailListEl.innerHTML = allDetailItems.map(t => `
+                        <div class="flex justify-between items-center bg-night-950 px-3 py-2 rounded-xl border border-gray-800">
+                            <div class="flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${t.type === 'in' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                                    ${t.type === 'in' ? '入金' : '出金'}
+                                </span>
+                                <span class="font-bold text-gray-200">${escapeHtml(t.category || 'その他')}</span>
+                                ${t.memo ? `<span class="text-gray-400 text-[11px]">(${escapeHtml(t.memo)})</span>` : ''}
+                            </div>
+                            <span class="font-mono font-extrabold ${t.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}">
+                                ${t.type === 'in' ? '+' : '-'}¥${Number(t.amount || 0).toLocaleString()}
+                            </span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // 全体リフレッシュ
+        function renderAll() {
+            updateLockUI();
+            renderBoyLogs();
+            renderSlips();
+            renderCashTransactions();
+            renderSummary();
+        }
+
+        // 日報コピールーチン (確実なクリップボード複製機能)
+        function copySummaryToClipboard() {
+            const dayData = getCurrentDayData();
+            const slips = dayData.slips || [];
+            const cashTxs = dayData.cashTransactions || [];
+            const boyLogs = dayData.boyWorkLogs || [];
+
+            let minNum = Infinity;
+            let maxNum = -Infinity;
+            let totalCustomers = 0;
+            let totalSales = 0;
+            let totalCashSales = 0;
+            let totalCardSales = 0;
+            let totalReceivableSales = 0;
+
+            slips.forEach(s => {
+                const num = parseInt(s.slipNumber, 10);
+                if (!isNaN(num)) {
+                    if (num < minNum) minNum = num;
+                    if (num > maxNum) maxNum = num;
+                }
+                totalCustomers += Number(s.customerCount || 0);
+                totalSales += Number(s.totalAmount || 0);
+                totalCashSales += Number(s.cashPayment || 0);
+                totalCardSales += Number(s.cardPayment || 0);
+                totalReceivableSales += Number(s.receivablePayment || 0);
+            });
+
+            const slipRangeStr = (minNum !== Infinity && maxNum !== -Infinity) ? `${minNum}番～${maxNum}番` : 'なし';
+
+            // 入金→出金の順で詳細に組み立て
+            const categoryOrder = [
+                { type: 'in', name: '売掛金' },
+                { type: 'in', name: '小口' },
+                { type: 'out', name: '日払い' },
+                { type: 'out', name: 'ボーイバック' },
+                { type: 'out', name: '送り' },
+                { type: 'out', name: '外注' },
+                { type: 'out', name: 'その他' }
+            ];
+
+            let cashDetailsLines = [];
+            if (totalCashSales > 0) {
+                cashDetailsLines.push(`・[入金:現金売上] ¥${totalCashSales.toLocaleString()}`);
+            }
+
+            cashTxs.forEach(m => {
+                const sign = m.type === 'in' ? '+' : '-';
+                cashDetailsLines.push(`・[${m.type === 'in' ? '入金' : '出金'}:${m.category || 'その他'}] ${m.memo ? m.memo + ' ' : ''}${sign}¥${Number(m.amount).toLocaleString()}`);
+            });
+
+            let boyLines = boyLogs.map(b => `・${b.name}: ${b.startTime}～${b.endTime} (${calculateWorkHours(b.startTime, b.endTime)})`);
+
+            // キャスト別バック集計 (10%)
+            let totalChampagneBack = 0;
+            const castBackMap = {};
+            slips.forEach(s => {
+                (s.champagnes || []).forEach(c => {
+                    const cast = c.castName || 'フリー';
+                    const price = Number(c.price) || 0;
+                    const back = Math.floor(price * 0.1);
+                    totalChampagneBack += back;
+                    castBackMap[cast] = (castBackMap[cast] || 0) + back;
+                });
+            });
+            let castBackLines = Object.entries(castBackMap).map(([cast, amt]) => `・${cast}: ¥${amt.toLocaleString()}`);
+
+            let cashInTotal = 0;
+            let cashOutTotal = 0;
+            cashTxs.forEach(t => {
+                if (t.type === 'in') cashInTotal += Number(t.amount || 0);
+                if (t.type === 'out') cashOutTotal += Number(t.amount || 0);
+            });
+
+            const initialCash = dayData.initialCash || 0;
+            const expectedCash = initialCash + totalCashSales + cashInTotal - cashOutTotal - totalChampagneBack;
+
+            let summaryText = `【本日の日報 (${appState.currentDate})】\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `■ 本日売上総額: ¥${totalSales.toLocaleString()}\n`;
+            summaryText += `  ・現金売上   : ¥${totalCashSales.toLocaleString()}\n`;
+            summaryText += `  ・カード売上 : ¥${totalCardSales.toLocaleString()}\n`;
+            summaryText += `  ・売掛金     : ¥${totalReceivableSales.toLocaleString()}\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `■ レジドロアー現金残: ¥${expectedCash.toLocaleString()}\n`;
+            summaryText += `  (準備金¥${initialCash.toLocaleString()} + 現金売上¥${totalCashSales.toLocaleString()} + 入金¥${cashInTotal.toLocaleString()} - 出金¥${cashOutTotal.toLocaleString()} - バック¥${totalChampagneBack.toLocaleString()})\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `■ 伝票番号   : ${slipRangeStr}\n`;
+            summaryText += `■ 来店組数   : ${slips.length}組\n`;
+            summaryText += `■ 総客数     : ${totalCustomers}名\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `【入出金明細】\n${cashDetailsLines.length > 0 ? cashDetailsLines.join('\n') : '・なし'}\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `【シャンパンバック内訳 (10%)】\n${castBackLines.length > 0 ? castBackLines.join('\n') : '・なし'}\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `【ボーイ勤務記録】\n${boyLines.length > 0 ? boyLines.join('\n') : '・なし'}\n`;
+
+            // フォールバック付きテキストコピー処理
+            const textArea = document.createElement('textarea');
+            textArea.value = summaryText;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            let successful = false;
+            try {
+                successful = document.execCommand('copy');
+            } catch (err) {
+                console.error('execCommand failed', err);
+            }
+            document.body.removeChild(textArea);
+
+            if (successful) {
+                showToast('日報用テキストをコピーしました！');
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(summaryText).then(() => {
+                    showToast('日報用テキストをコピーしました！');
+                }).catch(() => {
+                    showToast('コピーに失敗しました');
+                });
+            } else {
+                showToast('コピー機能に対応していません');
+            }
+        }
+
+        // トースト通知表示
+        function showToast(message) {
+            let toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toastContainer';
+                toastContainer.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-11/12 max-w-xs';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = 'bg-night-900 border border-amber-500/50 text-amber-300 text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 transform transition-all duration-300 opacity-0 translate-y-2';
+            toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-amber-400"></i><span>${escapeHtml(message)}</span>`;
+
+            toastContainer.appendChild(toast);
+            if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // 初期化処理
+        function initApp() {
+            loadAppState();
+
+            if (typeof window.initFirebaseCloud === 'function') {
+                window.initFirebaseCloud();
+            }
+
+            const loginOverlay = document.getElementById('loginOverlay');
+            if (loginOverlay) {
+                if (appState.isLoggedIn) {
+                    loginOverlay.classList.add('hidden');
+                } else {
+                    loginOverlay.classList.remove('hidden');
+                }
+            }
+
+            const dateInput = document.getElementById('currentDateInput');
+            if (dateInput) {
+                if (!dateInput.value) {
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    dateInput.value = `${yyyy}-${mm}-${dd}`;
+                }
+                appState.currentDate = dateInput.value;
+            }
+
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+
+            renderAll();
+        }
+
+        window.onload = function () {
+            initApp();
+        };
+    </script>
+</body>
+</html>
