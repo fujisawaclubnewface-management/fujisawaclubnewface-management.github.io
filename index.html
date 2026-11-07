@@ -59,7 +59,6 @@
   appId: "1:140519781819:web:88c09eff8dadf01df2809e",
   measurementId: "G-CT5MV5KVY0"
 };
-
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
 
@@ -1561,6 +1560,16 @@
                 return;
             }
 
+            // 指定された表示順序の定義
+            const categoryOrder = [
+                '【出金】キャスト日払い',
+                '【出金】ボーイ日払い',
+                '【出金】ボーイバック',
+                '【出金】送り',
+                '【出金】外注',
+                '【出金】その他'
+            ];
+
             // 入金・出金で整理し、さらにカテゴリー（項目）ごとにグループ化
             const grouped = {};
             txs.forEach(t => {
@@ -1577,7 +1586,20 @@
                 grouped[groupKey].items.push(t);
             });
 
-            container.innerHTML = Object.entries(grouped).map(([groupName, groupData]) => `
+            // グループを表示優先順に並び替え（入金が最優先、その後指定の出金順）
+            const sortedEntries = Object.entries(grouped).sort(([keyA, dataA], [keyB, dataB]) => {
+                if (dataA.type === 'in' && dataB.type !== 'in') return -1;
+                if (dataA.type !== 'in' && dataB.type === 'in') return 1;
+                if (dataA.type === 'in' && dataB.type === 'in') return keyA.localeCompare(keyB);
+                
+                const indexA = categoryOrder.indexOf(keyA);
+                const indexB = categoryOrder.indexOf(keyB);
+                const posA = indexA !== -1 ? indexA : 999;
+                const posB = indexB !== -1 ? indexB : 999;
+                return posA - posB;
+            });
+
+            container.innerHTML = sortedEntries.map(([groupName, groupData]) => `
                 <div class="bg-night-card border border-gray-800/90 rounded-2xl p-3.5 space-y-2 shadow-md">
                     <div class="flex justify-between items-center border-b border-gray-800 pb-2">
                         <span class="font-bold text-xs ${groupData.type === 'in' ? 'text-emerald-300' : 'text-amber-300'} flex items-center gap-1.5">
@@ -1705,6 +1727,15 @@
             // 出入金詳細一覧 (項目ごとにグループ化表示)
             const cashDetailListEl = document.getElementById('summaryCashDetailList');
             if (cashDetailListEl) {
+                const categoryOrder = [
+                    '【出金】キャスト日払い',
+                    '【出金】ボーイ日払い',
+                    '【出金】ボーイバック',
+                    '【出金】送り',
+                    '【出金】外注',
+                    '【出金】その他'
+                ];
+
                 const grouped = {};
                 if (totalCashSales > 0) {
                     grouped['【入金】現金売上'] = {
@@ -1728,7 +1759,18 @@
                     grouped[groupKey].items.push(t);
                 });
 
-                const groupEntries = Object.entries(grouped);
+                const groupEntries = Object.entries(grouped).sort(([keyA, dataA], [keyB, dataB]) => {
+                    if (dataA.type === 'in' && dataB.type !== 'in') return -1;
+                    if (dataA.type !== 'in' && dataB.type === 'in') return 1;
+                    if (dataA.type === 'in' && dataB.type === 'in') return keyA.localeCompare(keyB);
+                    
+                    const indexA = categoryOrder.indexOf(keyA);
+                    const indexB = categoryOrder.indexOf(keyB);
+                    const posA = indexA !== -1 ? indexA : 999;
+                    const posB = indexB !== -1 ? indexB : 999;
+                    return posA - posB;
+                });
+
                 if (groupEntries.length === 0) {
                     cashDetailListEl.innerHTML = '<div class="text-gray-500 text-xs py-1 text-center">本日の出入金記録はありません</div>';
                 } else {
@@ -1804,6 +1846,15 @@
             const slipRangeStr = (minNum !== Infinity && maxNum !== -Infinity) ? `${minNum}番～${maxNum}番` : 'なし';
 
             // 項目（カテゴリー）ごとにグループ化した出入金テキスト生成
+            const categoryOrder = [
+                '【出金】キャスト日払い',
+                '【出金】ボーイ日払い',
+                '【出金】ボーイバック',
+                '【出金】送り',
+                '【出金】外注',
+                '【出金】その他'
+            ];
+
             const groupedTxs = {};
             if (totalCashSales > 0) {
                 groupedTxs['【入金】現金売上'] = [{ memo: '伝票現金合算', amount: totalCashSales, type: 'in' }];
@@ -1814,8 +1865,22 @@
                 groupedTxs[groupKey].push(m);
             });
 
+            const sortedGroupEntries = Object.entries(groupedTxs).sort(([keyA, itemsA], [keyB, itemsB]) => {
+                const typeA = itemsA[0]?.type || 'out';
+                const typeB = itemsB[0]?.type || 'out';
+                if (typeA === 'in' && typeB !== 'in') return -1;
+                if (typeA !== 'in' && typeB === 'in') return 1;
+                if (typeA === 'in' && typeB === 'in') return keyA.localeCompare(keyB);
+                
+                const indexA = categoryOrder.indexOf(keyA);
+                const indexB = categoryOrder.indexOf(keyB);
+                const posA = indexA !== -1 ? indexA : 999;
+                const posB = indexB !== -1 ? indexB : 999;
+                return posA - posB;
+            });
+
             let cashDetailsLines = [];
-            Object.entries(groupedTxs).forEach(([groupName, items]) => {
+            sortedGroupEntries.forEach(([groupName, items]) => {
                 const groupTotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
                 const isIn = items[0]?.type === 'in';
                 cashDetailsLines.push(`${groupName} [合計: ${isIn ? '+' : '-'}¥${groupTotal.toLocaleString()}]`);
