@@ -366,6 +366,9 @@
                     <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
                         <i data-lucide="award" class="w-4 h-4 text-amber-400"></i> シャンパンバック支給内訳 (10%)
                     </div>
+                    <div id="summaryCastBackTotal" class="text-xs font-mono font-extrabold text-amber-400">
+                        総額: ¥0
+                    </div>
                 </div>
                 <div id="summaryCastBackList" class="space-y-1.5 text-xs">
                     <!-- JS描画 -->
@@ -1701,6 +1704,10 @@
             const expectedCashEl = document.getElementById('summaryExpectedCash');
             if (expectedCashEl) expectedCashEl.textContent = `¥${expectedCash.toLocaleString()}`;
 
+            // シャンパンバック総額表示
+            const castBackTotalEl = document.getElementById('summaryCastBackTotal');
+            if (castBackTotalEl) castBackTotalEl.textContent = `総額: ¥${totalChampagneBack.toLocaleString()}`;
+
             // キャスト別シャンパンバック詳細
             const castBackListEl = document.getElementById('summaryCastBackList');
             if (castBackListEl) {
@@ -1931,7 +1938,7 @@
             summaryText += `-------------------\n`;
             summaryText += `【入出金明細 (項目別)】\n${cashDetailsLines.length > 0 ? cashDetailsLines.join('\n') : '・なし'}\n`;
             summaryText += `-------------------\n`;
-            summaryText += `【シャンパンバック内訳 (10%)】\n${castBackLines.length > 0 ? castBackLines.join('\n') : '・なし'}\n`;
+            summaryText += `【シャンパンバック内訳 (10%) - 合計: ¥${totalChampagneBack.toLocaleString()}】\n${castBackLines.length > 0 ? castBackLines.join('\n') : '・なし'}\n`;
             summaryText += `-------------------\n`;
             summaryText += `【ボーイ勤務記録】\n${boyLines.length > 0 ? boyLines.join('\n') : '・なし'}\n`;
 
