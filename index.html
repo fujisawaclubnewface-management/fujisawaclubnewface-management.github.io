@@ -60,6 +60,7 @@
   measurementId: "G-CT5MV5KVY0"
 };
 
+
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
 
@@ -448,7 +449,7 @@
                         <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
                             <i data-lucide="hash" class="w-3 h-3 text-amber-400"></i> 伝票番号 <span class="text-rose-400">*</span>
                         </label>
-                        <input type="text" id="slipNumberInput" inputmode="numeric" pattern="[0-9]*" placeholder="例: 101" class="w-full bg-transparent text-amber-300 font-mono text-base font-extrabold focus:outline-none placeholder-gray-600">
+                        <input type="text" id="slipNumberInput" placeholder="例: 101" class="w-full bg-transparent text-amber-300 font-mono text-base font-extrabold focus:outline-none placeholder-gray-600">
                     </div>
                     <div class="bg-night-950/80 p-2.5 rounded-2xl border border-gray-800 focus-within:border-amber-500/50 transition-colors">
                         <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
@@ -475,7 +476,7 @@
                         <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
                             <i data-lucide="users" class="w-3 h-3 text-amber-400"></i> 客数 (名) <span class="text-rose-400">*</span>
                         </label>
-                        <input type="number" id="customerCountInput" inputmode="numeric" pattern="[0-9]*" value="1" min="1" class="w-full bg-transparent text-white font-mono text-base font-extrabold focus:outline-none">
+                        <input type="number" id="customerCountInput" value="1" min="1" class="w-full bg-transparent text-white font-mono text-base font-extrabold focus:outline-none">
                     </div>
                 </div>
 
@@ -495,7 +496,7 @@
                     </label>
                     <div class="relative flex items-center">
                         <span class="text-emerald-400 font-mono text-lg font-bold mr-1">¥</span>
-                        <input type="number" id="slipTotalAmountInput" inputmode="numeric" pattern="[0-9]*" placeholder="0" oninput="updatePaymentAmountsFromTotal()" class="w-full bg-transparent text-emerald-400 font-mono text-xl font-black focus:outline-none placeholder-emerald-900/50">
+                        <input type="number" id="slipTotalAmountInput" placeholder="0" oninput="updatePaymentAmountsFromTotal()" class="w-full bg-transparent text-emerald-400 font-mono text-xl font-black focus:outline-none placeholder-emerald-900/50">
                     </div>
                 </div>
 
@@ -526,21 +527,21 @@
                                 <span class="text-[10px] font-bold text-emerald-400">💵 現金</span>
                                 <button type="button" onclick="fillRemainingTo('cash')" title="残額をセット" class="text-[9px] text-emerald-400/80 hover:text-emerald-300 font-bold bg-emerald-500/10 px-1 rounded">残り全額</button>
                             </div>
-                            <input type="number" id="cashPaymentInput" inputmode="numeric" pattern="[0-9]*" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                            <input type="number" id="cashPaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
                         <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-sky-500/50 relative">
                             <div class="flex justify-between items-center mb-0.5">
                                 <span class="text-[10px] font-bold text-sky-400">💳 カード</span>
                                 <button type="button" onclick="fillRemainingTo('card')" title="残額をセット" class="text-[9px] text-sky-400/80 hover:text-sky-300 font-bold bg-sky-500/10 px-1 rounded">残り全額</button>
                             </div>
-                            <input type="number" id="cardPaymentInput" inputmode="numeric" pattern="[0-9]*" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                            <input type="number" id="cardPaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
                         <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-amber-500/50 relative">
                             <div class="flex justify-between items-center mb-0.5">
                                 <span class="text-[10px] font-bold text-amber-400">📝 売掛</span>
                                 <button type="button" onclick="fillRemainingTo('receivable')" title="残額をセット" class="text-[9px] text-amber-400/80 hover:text-amber-300 font-bold bg-amber-500/10 px-1 rounded">残り全額</button>
                             </div>
-                            <input type="number" id="receivablePaymentInput" inputmode="numeric" pattern="[0-9]*" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                            <input type="number" id="receivablePaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
                     </div>
                 </div>
@@ -590,7 +591,7 @@
             <div class="p-4 space-y-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">本日の準備金金額 (円)</label>
-                    <input type="number" id="initialCashInput" inputmode="numeric" pattern="[0-9]*" placeholder="30000" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
+                    <input type="number" id="initialCashInput" placeholder="30000" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
                 </div>
             </div>
             <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-end gap-2">
@@ -691,7 +692,7 @@
 
                 <div>
                     <label class="block text-gray-400 mb-1">金額 (円) <span class="text-rose-400">*</span></label>
-                    <input type="number" id="cashAmountInput" inputmode="numeric" pattern="[0-9]*" placeholder="0" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
+                    <input type="number" id="cashAmountInput" placeholder="0" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
                 </div>
 
                 <div>
@@ -886,10 +887,12 @@
         // ログイン処理
         function handleLoginSubmit(e) {
             e.preventDefault();
-            const inputPin = document.getElementById('loginPinInput')?.value || '';
+            // 入力されたPINの文字列を確実に取得し、前後の空白や改行を削除する
+            const inputPin = String(document.getElementById('loginPinInput')?.value || '').trim();
+            const correctPin = String(appState.pinCode || '1234').trim();
             const errorMsg = document.getElementById('loginErrorMsg');
 
-            if (inputPin === appState.pinCode) {
+            if (inputPin === correctPin) {
                 appState.isLoggedIn = true;
                 saveAppState();
                 const loginOverlay = document.getElementById('loginOverlay');
@@ -1281,7 +1284,7 @@
                     </div>
                     <div>
                         <label class="block text-[9px] text-gray-400 font-medium mb-0.5">金額 (円)</label>
-                        <input type="number" inputmode="numeric" pattern="[0-9]*" value="${item.price || 0}" placeholder="0" oninput="currentChampagneItems[${idx}].price = parseInt(this.value, 10) || 0; currentChampagneItems[${idx}].backRate = 0.1;" class="w-full bg-night-950 border border-gray-700/80 focus:border-emerald-400 text-emerald-400 font-mono text-sm font-extrabold rounded-xl p-2 focus:outline-none">
+                        <input type="number" value="${item.price || 0}" placeholder="0" oninput="currentChampagneItems[${idx}].price = parseInt(this.value, 10) || 0; currentChampagneItems[${idx}].backRate = 0.1;" class="w-full bg-night-950 border border-gray-700/80 focus:border-emerald-400 text-emerald-400 font-mono text-sm font-extrabold rounded-xl p-2 focus:outline-none">
                     </div>
                 </div>
             `).join('');
@@ -1290,4 +1293,905 @@
                 lucide.createIcons();
             }
         }
-<!-- ... existing code ...
+
+        function saveSlip() {
+            const slipId = document.getElementById('slipId')?.value || '';
+            const slipNumber = document.getElementById('slipNumberInput')?.value || '';
+            const tableNumber = document.getElementById('tableNumberSelect')?.value || '';
+            const customerCount = parseInt(document.getElementById('customerCountInput')?.value, 10) || 1;
+            const memo = document.getElementById('slipMemoInput')?.value?.trim() || '';
+            const totalAmount = parseInt(document.getElementById('slipTotalAmountInput')?.value, 10) || 0;
+            const cashPayment = parseInt(document.getElementById('cashPaymentInput')?.value, 10) || 0;
+            const cardPayment = parseInt(document.getElementById('cardPaymentInput')?.value, 10) || 0;
+            const receivablePayment = parseInt(document.getElementById('receivablePaymentInput')?.value, 10) || 0;
+
+            if (!slipNumber) {
+                showToast('伝票番号を入力してください');
+                return;
+            }
+
+            const dayData = getCurrentDayData();
+            if (!dayData.slips) dayData.slips = [];
+
+            // 各シャンパンのバック率を必ず10%に設定
+            const processedChampagnes = (currentChampagneItems || []).map(c => ({
+                ...c,
+                backRate: 0.1
+            }));
+
+            const slipData = {
+                id: slipId || generateId(),
+                slipNumber,
+                tableNumber,
+                customerCount,
+                memo,
+                totalAmount,
+                cashPayment,
+                cardPayment,
+                receivablePayment,
+                champagnes: processedChampagnes
+            };
+
+            if (slipId) {
+                const idx = dayData.slips.findIndex(s => s.id === slipId);
+                if (idx !== -1) dayData.slips[idx] = slipData;
+            } else {
+                dayData.slips.push(slipData);
+            }
+
+            saveAppState();
+            closeSlipModal();
+            renderAll();
+            showToast('伝票を保存しました');
+        }
+
+        function deleteSlip() {
+            const slipId = document.getElementById('slipId')?.value || '';
+            if (!slipId) return;
+
+            const dayData = getCurrentDayData();
+            dayData.slips = (dayData.slips || []).filter(s => s.id !== slipId);
+
+            saveAppState();
+            closeSlipModal();
+            renderAll();
+            showToast('伝票を削除しました');
+        }
+
+        // --- 出入金（Cash Transaction）モーダル操作 ---
+        function openCashModal(type = 'out', txId = null) {
+            if (appState.isLocked) {
+                showToast('レジ締め完了後のため操作できません');
+                return;
+            }
+            const modal = document.getElementById('cashModal');
+            const deleteBtn = document.getElementById('deleteCashBtn');
+            const modalTitle = document.getElementById('cashModalTitle');
+            if (!modal) return;
+
+            const cashIdEl = document.getElementById('cashIdInput');
+            const cashTypeEl = document.getElementById('cashTypeInput');
+            const cashAmtEl = document.getElementById('cashAmountInput');
+            const cashMemoEl = document.getElementById('cashMemoInput');
+            const dayData = getCurrentDayData();
+
+            if (txId) {
+                const tx = (dayData.cashTransactions || []).find(t => t.id === txId);
+                if (tx) {
+                    if (cashIdEl) cashIdEl.value = tx.id;
+                    if (cashTypeEl) cashTypeEl.value = tx.type;
+                    updateCashCategoryOptions(tx.type);
+                    
+                    const catSelect = document.getElementById('cashCategorySelect');
+                    if (catSelect) catSelect.value = tx.category || '';
+
+                    if (cashAmtEl) cashAmtEl.value = tx.amount || '';
+                    if (cashMemoEl) cashMemoEl.value = tx.memo || '';
+
+                    if (modalTitle) modalTitle.textContent = tx.type === 'in' ? '入金記録の編集' : '出金記録の編集';
+                    if (deleteBtn) deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                if (cashIdEl) cashIdEl.value = '';
+                if (cashTypeEl) cashTypeEl.value = type;
+                updateCashCategoryOptions(type);
+
+                if (cashAmtEl) cashAmtEl.value = '';
+                if (cashMemoEl) cashMemoEl.value = '';
+
+                if (modalTitle) modalTitle.textContent = type === 'in' ? '入金登録' : '出金登録';
+                if (deleteBtn) deleteBtn.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function updateCashCategoryOptions(type) {
+            const catSelect = document.getElementById('cashCategorySelect');
+            if (!catSelect) return;
+
+            catSelect.innerHTML = '';
+            // 「日払い」を「キャスト日払い」と「ボーイ日払い」に分割
+            const categories = type === 'in' ? ['売掛金', '小口'] : ['キャスト日払い', 'ボーイ日払い', 'ボーイバック', '送り', '外注', 'その他'];
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                catSelect.appendChild(opt);
+            });
+        }
+
+        function closeCashModal() {
+            const modal = document.getElementById('cashModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveCashTransaction() {
+            const txId = document.getElementById('cashIdInput')?.value || '';
+            const type = document.getElementById('cashTypeInput')?.value || 'out';
+            const category = document.getElementById('cashCategorySelect')?.value || 'その他';
+            const amount = parseInt(document.getElementById('cashAmountInput')?.value, 10) || 0;
+            const memo = document.getElementById('cashMemoInput')?.value || '';
+
+            if (amount <= 0) {
+                showToast('金額を入力してください');
+                return;
+            }
+
+            const dayData = getCurrentDayData();
+            if (!dayData.cashTransactions) dayData.cashTransactions = [];
+
+            if (txId) {
+                const idx = dayData.cashTransactions.findIndex(t => t.id === txId);
+                if (idx !== -1) {
+                    dayData.cashTransactions[idx] = { id: txId, type, category, amount, memo };
+                }
+            } else {
+                dayData.cashTransactions.push({
+                    id: generateId(),
+                    type,
+                    category,
+                    amount,
+                    memo
+                });
+            }
+
+            saveAppState();
+            closeCashModal();
+            renderAll();
+            showToast('出入金記録を保存しました');
+        }
+
+        function deleteCashTransaction() {
+            const txId = document.getElementById('cashIdInput')?.value || '';
+            if (!txId) return;
+
+            const dayData = getCurrentDayData();
+            dayData.cashTransactions = (dayData.cashTransactions || []).filter(s => s.id !== txId);
+
+            saveAppState();
+            closeCashModal();
+            renderAll();
+            showToast('出入金記録を削除しました');
+        }
+
+        // --- ボーイ管理 ---
+        function openAddBoyMasterModal() {
+            const modal = document.getElementById('addBoyModal');
+            const input = document.getElementById('newBoyNameInput');
+            if (input) input.value = '';
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeAddBoyMasterModal() {
+            const modal = document.getElementById('addBoyModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveNewBoyMaster() {
+            const input = document.getElementById('newBoyNameInput');
+            if (!input || !input.value.trim()) {
+                showToast('ボーイ名を入力してください');
+                return;
+            }
+            const newName = input.value.trim();
+            if (!appState.masterBoys.includes(newName)) {
+                appState.masterBoys.push(newName);
+                saveAppState();
+            }
+            closeAddBoyMasterModal();
+            openBoyWorkModal();
+            showToast(`ボーイ「${newName}」を追加しました`);
+        }
+
+        function openBoyWorkModal(logId = null) {
+            const modal = document.getElementById('boyWorkModal');
+            const select = document.getElementById('boySelect');
+            const startSelect = document.getElementById('boyStartTime');
+            const endSelect = document.getElementById('boyEndTime');
+            const deleteBtn = document.getElementById('deleteBoyWorkBtn');
+            if (!modal || !select) return;
+
+            const masterBoys = appState.masterBoys || [];
+            select.innerHTML = masterBoys.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+
+            const dayData = getCurrentDayData();
+            if (logId) {
+                const log = (dayData.boyWorkLogs || []).find(l => l.id === logId);
+                if (log) {
+                    const boyWorkIdEl = document.getElementById('boyWorkId');
+                    if (boyWorkIdEl) boyWorkIdEl.value = log.id;
+                    select.value = log.name;
+
+                    if (startSelect) populateTimeSelectOptions(startSelect, log.startTime || '20:00');
+                    if (endSelect) populateTimeSelectOptions(endSelect, log.endTime || '03:00');
+
+                    if (deleteBtn) deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                const boyWorkIdEl = document.getElementById('boyWorkId');
+                if (boyWorkIdEl) boyWorkIdEl.value = '';
+
+                if (startSelect) populateTimeSelectOptions(startSelect, '20:00');
+                if (endSelect) populateTimeSelectOptions(endSelect, '03:00');
+
+                if (deleteBtn) deleteBtn.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeBoyWorkModal() {
+            const modal = document.getElementById('boyWorkModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveBoyWorkLog() {
+            const logIdEl = document.getElementById('boyWorkId');
+            const selectEl = document.getElementById('boySelect');
+            const startEl = document.getElementById('boyStartTime');
+            const endEl = document.getElementById('boyEndTime');
+
+            if (!selectEl || !selectEl.value) {
+                showToast('ボーイを選択してください');
+                return;
+            }
+
+            const logId = logIdEl ? logIdEl.value : '';
+            const name = selectEl.value;
+            const startTime = startEl ? startEl.value : '20:00';
+            const endTime = endEl ? endEl.value : '03:00';
+
+            const dayData = getCurrentDayData();
+            if (!dayData.boyWorkLogs) dayData.boyWorkLogs = [];
+
+            if (logId) {
+                const idx = dayData.boyWorkLogs.findIndex(l => l.id === logId);
+                if (idx !== -1) {
+                    dayData.boyWorkLogs[idx] = { 
+                        ...dayData.boyWorkLogs[idx], 
+                        name, 
+                        startTime, 
+                        endTime 
+                    };
+                }
+            } else {
+                dayData.boyWorkLogs.push({
+                    id: generateId(),
+                    name,
+                    startTime,
+                    endTime,
+                    createdAt: Date.now() // 登録順ソート用のタイムスタンプ
+                });
+            }
+
+            saveAppState();
+            closeBoyWorkModal();
+            renderBoyLogs();
+            showToast('勤務記録を保存しました');
+        }
+
+        function deleteBoyWorkLog() {
+            const logIdEl = document.getElementById('boyWorkId');
+            const logId = logIdEl ? logIdEl.value : '';
+            if (!logId) return;
+
+            const dayData = getCurrentDayData();
+            dayData.boyWorkLogs = (dayData.boyWorkLogs || []).filter(l => l.id !== logId);
+
+            saveAppState();
+            closeBoyWorkModal();
+            renderBoyLogs();
+            showToast('勤務記録を削除しました');
+        }
+
+        function renderBoyLogs() {
+            const container = document.getElementById('boyWorkLogList');
+            if (!container) return;
+
+            const dayData = getCurrentDayData();
+            // 登録順（作成日時が古い順）にソート
+            const logs = (dayData.boyWorkLogs || []).slice().sort((a, b) => {
+                const timeA = a.createdAt || 0;
+                const timeB = b.createdAt || 0;
+                return timeA - timeB;
+            });
+
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500 text-xs">
+                        本日の勤務記録はまだありません
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const duration = calculateWorkHours(log.startTime, log.endTime);
+                return `
+                    <div class="bg-night-card border border-gray-800/80 rounded-xl p-3 flex justify-between items-center hover:border-amber-500/30 transition-all cursor-pointer" onclick="openBoyWorkModal('${log.id}')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs">
+                                ${escapeHtml(log.name.charAt(0))}
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm text-gray-200">${escapeHtml(log.name)}</div>
+                                <div class="text-xs text-gray-400 font-mono">${escapeHtml(log.startTime || '20:00')} ～ ${escapeHtml(log.endTime || '05:00')}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="inline-block px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono text-xs font-bold">
+                                ${duration}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- 伝票・現金・集計描画 ---
+        function renderSlips() {
+            const container = document.getElementById('slipList');
+            if (!container) return;
+            const dayData = getCurrentDayData();
+            const slips = (dayData.slips || []).slice().sort((a, b) => {
+                const numA = parseInt(a.slipNumber, 10) || 0;
+                const numB = parseInt(b.slipNumber, 10) || 0;
+                return numA - numB;
+            });
+
+            if (slips.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-night-card border border-gray-800/80 rounded-2xl p-8 text-center text-gray-500 text-xs">
+                        <i data-lucide="receipt" class="w-8 h-8 text-gray-600 mx-auto mb-2 opacity-50"></i>
+                        本日の伝票はまだありません
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = slips.map(s => {
+                const champagnesCount = (s.champagnes || []).length;
+                return `
+                    <div class="bg-night-card border border-gray-800/90 rounded-2xl p-3.5 flex justify-between items-center cursor-pointer hover:border-amber-500/40 active:scale-[0.98] transition-all shadow-md" onclick="openSlipModal('${s.id}')">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-lg text-xs font-mono font-extrabold">
+                                    #${escapeHtml(s.slipNumber || '')}
+                                </span>
+                                ${s.tableNumber ? `<span class="bg-sky-500/10 text-sky-300 border border-sky-500/20 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3 text-sky-400"></i> ${escapeHtml(s.tableNumber)}卓</span>` : ''}
+                                <span class="text-xs text-gray-300 font-medium">👥 ${escapeHtml(s.customerCount || 1)}名</span>
+                                ${s.memo ? `<span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1"><i data-lucide="sticky-note" class="w-3 h-3 text-amber-400"></i> ${escapeHtml(s.memo)}</span>` : ''}
+                                ${champagnesCount > 0 ? `<span class="bg-rose-500/10 text-rose-300 border border-rose-500/20 text-[10px] px-1.5 py-0.5 rounded-md font-bold">🍾 ${champagnesCount}</span>` : ''}
+                            </div>
+                            <div class="text-[11px] text-gray-400">
+                                現金: ¥${Number(s.cashPayment || 0).toLocaleString()} / カード: ¥${Number(s.cardPayment || 0).toLocaleString()} / 売掛: ¥${Number(s.receivablePayment || 0).toLocaleString()}
+                            </div>
+                        </div>
+                        <div class="text-right ml-2 shrink-0">
+                            <div class="font-mono font-black text-emerald-400 text-base">¥${Number(s.totalAmount || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderCashTransactions() {
+            const container = document.getElementById('cashList');
+            if (!container) return;
+
+            const dayData = getCurrentDayData();
+            const cashTxs = dayData.cashTransactions || [];
+
+            if (cashTxs.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-night-card border border-gray-800/80 rounded-2xl p-8 text-center text-gray-500 text-xs">
+                        <i data-lucide="arrow-left-right" class="w-8 h-8 text-gray-600 mx-auto mb-2 opacity-50"></i>
+                        本日の出入金記録はまだありません
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
+
+            const categoryOrder = [
+                '【出金】キャスト日払い',
+                '【出金】ボーイ日払い',
+                '【出金】ボーイバック',
+                '【出金】送り',
+                '【出金】外注',
+                '【出金】その他'
+            ];
+
+            const grouped = {};
+            cashTxs.forEach(t => {
+                const groupKey = `${t.type === 'in' ? '【入金】' : '【出金】'}${t.category || 'その他'}`;
+                if (!grouped[groupKey]) {
+                    grouped[groupKey] = {
+                        type: t.type,
+                        category: t.category || 'その他',
+                        total: 0,
+                        items: []
+                    };
+                }
+                grouped[groupKey].total += Number(t.amount || 0);
+                grouped[groupKey].items.push(t);
+            });
+
+            const groupEntries = Object.entries(grouped).sort(([keyA, dataA], [keyB, dataB]) => {
+                if (dataA.type === 'in' && dataB.type !== 'in') return -1;
+                if (dataA.type !== 'in' && dataB.type === 'in') return 1;
+                if (dataA.type === 'in' && dataB.type === 'in') return keyA.localeCompare(keyB);
+                
+                const indexA = categoryOrder.indexOf(keyA);
+                const indexB = categoryOrder.indexOf(keyB);
+                const posA = indexA !== -1 ? indexA : 999;
+                const posB = indexB !== -1 ? indexB : 999;
+                return posA - posB;
+            });
+
+            container.innerHTML = groupEntries.map(([groupName, groupData]) => `
+                <div class="bg-night-card border border-gray-800/90 rounded-2xl p-3.5 space-y-2 shadow-md">
+                    <div class="flex justify-between items-center border-b border-gray-800/80 pb-1.5">
+                        <span class="font-bold text-xs ${groupData.type === 'in' ? 'text-emerald-300' : 'text-amber-300'} flex items-center gap-1.5">
+                            <i data-lucide="${groupData.type === 'in' ? 'arrow-down-left' : 'arrow-up-right'}" class="w-4 h-4 ${groupData.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}"></i>
+                            ${escapeHtml(groupName)}
+                        </span>
+                        <span class="font-mono font-extrabold text-xs ${groupData.type === 'in' ? 'text-emerald-400' : 'text-rose-400'} bg-night-950 px-2 py-0.5 rounded-lg border border-gray-800">
+                            小計: ${groupData.type === 'in' ? '+' : '-'}¥${groupData.total.toLocaleString()}
+                        </span>
+                    </div>
+                    <div class="space-y-1.5">
+                        ${groupData.items.map(i => `
+                            <div class="flex justify-between items-center bg-night-950/60 p-2 rounded-xl border border-gray-800/60 hover:border-gray-700 cursor-pointer transition-colors" onclick="openCashModal('${i.type}', '${i.id}')">
+                                <div class="text-xs text-gray-300 font-medium">
+                                    ${i.memo ? escapeHtml(i.memo) : '(メモなし)'}
+                                </div>
+                                <div class="font-mono font-extrabold text-xs ${groupData.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}">
+                                    ¥${Number(i.amount || 0).toLocaleString()}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderSummary() {
+            const dayData = getCurrentDayData();
+            const slips = dayData.slips || [];
+            const cashTxs = dayData.cashTransactions || [];
+
+            let totalSales = 0;
+            let totalCashSales = 0; 
+            let totalCardSales = 0;
+            let totalReceivableSales = 0;
+
+            slips.forEach(s => {
+                totalSales += Number(s.totalAmount || 0);
+                totalCashSales += Number(s.cashPayment || 0); 
+                totalCardSales += Number(s.cardPayment || 0);
+                totalReceivableSales += Number(s.receivablePayment || 0);
+            });
+
+            let cashIn = 0;
+            let cashOut = 0;
+            cashTxs.forEach(t => {
+                if (t.type === 'in') cashIn += Number(t.amount || 0);
+                if (t.type === 'out') cashOut += Number(t.amount || 0);
+            });
+
+            // キャスト別シャンパンバック計算 (10%) - expectedCashの計算前に実行
+            let totalChampagneBack = 0;
+            const castBackMap = {};
+            const castChampagneDetails = {}; // キャストごとの注文内訳
+
+            slips.forEach(s => {
+                (s.champagnes || []).forEach(c => {
+                    const cast = c.castName || 'フリー';
+                    const price = Number(c.price) || 0;
+                    const back = Math.floor(price * 0.1);
+                    totalChampagneBack += back;
+                    castBackMap[cast] = (castBackMap[cast] || 0) + back;
+
+                    if (!castChampagneDetails[cast]) castChampagneDetails[cast] = [];
+                    castChampagneDetails[cast].push({
+                        brand: c.brandName || 'シャンパン',
+                        price: price,
+                        back: back,
+                        slipNum: s.slipNumber
+                    });
+                });
+            });
+
+            const initialCash = dayData.initialCash || 0;
+            const expectedCash = initialCash + totalCashSales + cashIn - cashOut - totalChampagneBack;
+
+            // UI反映
+            const totalSalesEl = document.getElementById('summaryTotalSales');
+            if (totalSalesEl) totalSalesEl.textContent = `¥${totalSales.toLocaleString()}`;
+
+            const cashSalesEl = document.getElementById('summaryCashSales');
+            if (cashSalesEl) cashSalesEl.textContent = `¥${totalCashSales.toLocaleString()}`;
+
+            const cardSalesEl = document.getElementById('summaryCardSales');
+            if (cardSalesEl) cardSalesEl.textContent = `¥${totalCardSales.toLocaleString()}`;
+
+            const recvSalesEl = document.getElementById('summaryReceivableSales');
+            if (recvSalesEl) recvSalesEl.textContent = `¥${totalReceivableSales.toLocaleString()}`;
+
+            const cashInEl = document.getElementById('summaryCashIn');
+            if (cashInEl) cashInEl.textContent = `¥${(cashIn + totalCashSales).toLocaleString()}`;
+
+            const cashOutEl = document.getElementById('summaryCashOut');
+            if (cashOutEl) cashOutEl.textContent = `¥${cashOut.toLocaleString()}`;
+
+            const initialCashEl = document.getElementById('summaryInitialCash');
+            if (initialCashEl) initialCashEl.textContent = `¥${initialCash.toLocaleString()}`;
+
+            const expectedCashEl = document.getElementById('summaryExpectedCash');
+            if (expectedCashEl) expectedCashEl.textContent = `¥${expectedCash.toLocaleString()}`;
+
+            // シャンパンバック総額表示
+            const castBackTotalEl = document.getElementById('summaryCastBackTotal');
+            if (castBackTotalEl) castBackTotalEl.textContent = `総額: ¥${totalChampagneBack.toLocaleString()}`;
+
+            // キャスト別シャンパンバック詳細
+            const castBackListEl = document.getElementById('summaryCastBackList');
+            if (castBackListEl) {
+                const entries = Object.entries(castBackMap);
+                if (entries.length === 0) {
+                    castBackListEl.innerHTML = '<div class="text-gray-500 text-xs py-1">本日のシャンパンバック該当者はありません</div>';
+                } else {
+                    castBackListEl.innerHTML = entries.map(([cast, amt]) => {
+                        const details = castChampagneDetails[cast] || [];
+                        const detailStr = details.map(d => `${d.brand}(¥${d.price.toLocaleString()} → バック¥${d.back.toLocaleString()})`).join(', ');
+                        return `
+                            <div class="bg-night-950 p-2.5 rounded-xl border border-gray-800 space-y-1">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-gray-200">✨ ${escapeHtml(cast)}</span>
+                                    <span class="font-mono font-extrabold text-amber-400">¥${amt.toLocaleString()}</span>
+                                </div>
+                                <div class="text-[10px] text-gray-400">内訳: ${escapeHtml(detailStr)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // 出入金詳細一覧 (項目ごとにグループ化表示)
+            const cashDetailListEl = document.getElementById('summaryCashDetailList');
+            if (cashDetailListEl) {
+                const categoryOrder = [
+                    '【出金】キャスト日払い',
+                    '【出金】ボーイ日払い',
+                    '【出金】ボーイバック',
+                    '【出金】送り',
+                    '【出金】外注',
+                    '【出金】その他'
+                ];
+
+                const grouped = {};
+                if (totalCashSales > 0) {
+                    grouped['【入金】現金売上'] = {
+                        type: 'in',
+                        category: '現金売上',
+                        total: totalCashSales,
+                        items: [{ memo: '伝票からの現金合算', amount: totalCashSales }]
+                    };
+                }
+                cashTxs.forEach(t => {
+                    const groupKey = `${t.type === 'in' ? '【入金】' : '【出金】'}${t.category || 'その他'}`;
+                    if (!grouped[groupKey]) {
+                        grouped[groupKey] = {
+                            type: t.type,
+                            category: t.category || 'その他',
+                            total: 0,
+                            items: []
+                        };
+                    }
+                    grouped[groupKey].total += Number(t.amount || 0);
+                    grouped[groupKey].items.push(t);
+                });
+
+                const groupEntries = Object.entries(grouped).sort(([keyA, dataA], [keyB, dataB]) => {
+                    if (dataA.type === 'in' && dataB.type !== 'in') return -1;
+                    if (dataA.type !== 'in' && dataB.type === 'in') return 1;
+                    if (dataA.type === 'in' && dataB.type === 'in') return keyA.localeCompare(keyB);
+                    
+                    const indexA = categoryOrder.indexOf(keyA);
+                    const indexB = categoryOrder.indexOf(keyB);
+                    const posA = indexA !== -1 ? indexA : 999;
+                    const posB = indexB !== -1 ? indexB : 999;
+                    return posA - posB;
+                });
+
+                if (groupEntries.length === 0) {
+                    cashDetailListEl.innerHTML = '<div class="text-gray-500 text-xs py-1 text-center">本日の出入金記録はありません</div>';
+                } else {
+                    cashDetailListEl.innerHTML = groupEntries.map(([groupName, groupData]) => `
+                        <div class="bg-night-950 p-2.5 rounded-xl border border-gray-800 space-y-1.5">
+                            <div class="flex justify-between items-center border-b border-gray-800/80 pb-1">
+                                <span class="font-bold text-xs ${groupData.type === 'in' ? 'text-emerald-300' : 'text-amber-300'}">
+                                    ${escapeHtml(groupName)}
+                                </span>
+                                <span class="font-mono font-extrabold text-xs ${groupData.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}">
+                                    合計: ${groupData.type === 'in' ? '+' : '-'}¥${groupData.total.toLocaleString()}
+                                </span>
+                            </div>
+                            <div class="space-y-1 pl-1">
+                                ${groupData.items.map(i => `
+                                    <div class="flex justify-between text-[11px] text-gray-400">
+                                        <span>・${i.memo ? escapeHtml(i.memo) : '(メモなし)'}</span>
+                                        <span class="font-mono font-bold ${groupData.type === 'in' ? 'text-emerald-400/80' : 'text-rose-400/80'}">
+                                            ¥${Number(i.amount || 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // 全体リフレッシュ
+        function renderAll() {
+            updateLockUI();
+            renderBoyLogs();
+            renderSlips();
+            renderCashTransactions();
+            renderSummary();
+        }
+
+        // 日報コピールーチン (確実なクリップボード複製機能)
+        function copySummaryToClipboard() {
+            const dayData = getCurrentDayData();
+            const slips = (dayData.slips || []).slice().sort((a, b) => {
+                const numA = parseInt(a.slipNumber, 10) || 0;
+                const numB = parseInt(b.slipNumber, 10) || 0;
+                return numA - numB;
+            });
+            const cashTxs = dayData.cashTransactions || [];
+            const boyLogs = dayData.boyWorkLogs || [];
+
+            let minNum = Infinity;
+            let maxNum = -Infinity;
+            let totalCustomers = 0;
+            let totalSales = 0;
+            let totalCashSales = 0;
+            let totalCardSales = 0;
+            let totalReceivableSales = 0;
+
+            slips.forEach(s => {
+                const num = parseInt(s.slipNumber, 10);
+                if (!isNaN(num)) {
+                    if (num < minNum) minNum = num;
+                    if (num > maxNum) maxNum = num;
+                }
+                totalCustomers += Number(s.customerCount || 0);
+                totalSales += Number(s.totalAmount || 0);
+                totalCashSales += Number(s.cashPayment || 0);
+                totalCardSales += Number(s.cardPayment || 0);
+                totalReceivableSales += Number(s.receivablePayment || 0);
+            });
+
+            const slipRangeStr = (minNum !== Infinity && maxNum !== -Infinity) ? `${minNum}番～${maxNum}番` : 'なし';
+
+            // 項目（カテゴリー）ごとにグループ化した出入金テキスト生成
+            const categoryOrder = [
+                '【出金】キャスト日払い',
+                '【出金】ボーイ日払い',
+                '【出金】ボーイバック',
+                '【出金】送り',
+                '【出金】外注',
+                '【出金】その他'
+            ];
+
+            const groupedTxs = {};
+            if (totalCashSales > 0) {
+                groupedTxs['【入金】現金売上'] = [{ memo: '伝票現金合算', amount: totalCashSales, type: 'in' }];
+            }
+            cashTxs.forEach(m => {
+                const groupKey = `${m.type === 'in' ? '【入金】' : '【出金】'}${m.category || 'その他'}`;
+                if (!groupedTxs[groupKey]) groupedTxs[groupKey] = [];
+                groupedTxs[groupKey].push(m);
+            });
+
+            const sortedGroupEntries = Object.entries(groupedTxs).sort(([keyA, itemsA], [keyB, itemsB]) => {
+                const typeA = itemsA[0]?.type || 'out';
+                const typeB = itemsB[0]?.type || 'out';
+                if (typeA === 'in' && typeB !== 'in') return -1;
+                if (typeA !== 'in' && typeB === 'in') return 1;
+                if (typeA === 'in' && typeB === 'in') return keyA.localeCompare(keyB);
+                
+                const indexA = categoryOrder.indexOf(keyA);
+                const indexB = categoryOrder.indexOf(keyB);
+                const posA = indexA !== -1 ? indexA : 999;
+                const posB = indexB !== -1 ? indexB : 999;
+                return posA - posB;
+            });
+
+            let cashDetailsLines = [];
+            sortedGroupEntries.forEach(([groupName, items]) => {
+                const groupTotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+                const isIn = items[0]?.type === 'in';
+                cashDetailsLines.push(`${groupName} [合計: ${isIn ? '+' : '-'}¥${groupTotal.toLocaleString()}]`);
+                items.forEach(item => {
+                    cashDetailsLines.push(`  ・${item.memo ? item.memo + ' ' : ''}¥${Number(item.amount || 0).toLocaleString()}`);
+                });
+            });
+
+            let boyLines = boyLogs.map(b => `・${b.name}: ${b.startTime}～${b.endTime} (${calculateWorkHours(b.startTime, b.endTime)})`);
+
+            // キャスト別バック集計 (10%)
+            let totalChampagneBack = 0;
+            const castBackMap = {};
+            slips.forEach(s => {
+                (s.champagnes || []).forEach(c => {
+                    const cast = c.castName || 'フリー';
+                    const price = Number(c.price) || 0;
+                    const back = Math.floor(price * 0.1);
+                    totalChampagneBack += back;
+                    castBackMap[cast] = (castBackMap[cast] || 0) + back;
+                });
+            });
+            let castBackLines = Object.entries(castBackMap).map(([cast, amt]) => `・${cast}: ¥${amt.toLocaleString()}`);
+
+            let cashInTotal = 0;
+            let cashOutTotal = 0;
+            cashTxs.forEach(t => {
+                if (t.type === 'in') cashInTotal += Number(t.amount || 0);
+                if (t.type === 'out') cashOutTotal += Number(t.amount || 0);
+            });
+
+            const initialCash = dayData.initialCash || 0;
+            const expectedCash = initialCash + totalCashSales + cashInTotal - cashOutTotal - totalChampagneBack;
+
+            let summaryText = `【本日の日報 (${appState.currentDate})】\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `■ 本日売上総額: ¥${totalSales.toLocaleString()}\n`;
+            summaryText += `  ・現金売上   : ¥${totalCashSales.toLocaleString()}\n`;
+            summaryText += `  ・カード売上 : ¥${totalCardSales.toLocaleString()}\n`;
+            summaryText += `  ・売掛金     : ¥${totalReceivableSales.toLocaleString()}\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `■ レジドロアー現金残: ¥${expectedCash.toLocaleString()}\n`;
+            summaryText += `  (準備金¥${initialCash.toLocaleString()} + 現金売上¥${totalCashSales.toLocaleString()} + 入金¥${cashInTotal.toLocaleString()} - 出金¥${cashOutTotal.toLocaleString()} - バック¥${totalChampagneBack.toLocaleString()})\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `■ 伝票番号   : ${slipRangeStr}\n`;
+            summaryText += `■ 来店組数   : ${slips.length}組\n`;
+            summaryText += `■ 総客数     : ${totalCustomers}名\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `【入出金明細 (項目別)】\n${cashDetailsLines.length > 0 ? cashDetailsLines.join('\n') : '・なし'}\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `【シャンパンバック内訳 (10%) - 合計: ¥${totalChampagneBack.toLocaleString()}】\n${castBackLines.length > 0 ? castBackLines.join('\n') : '・なし'}\n`;
+            summaryText += `-------------------\n`;
+            summaryText += `【ボーイ勤務記録】\n${boyLines.length > 0 ? boyLines.join('\n') : '・なし'}\n`;
+
+            // フォールバック付きテキストコピー処理
+            const textArea = document.createElement('textarea');
+            textArea.value = summaryText;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            let successful = false;
+            try {
+                successful = document.execCommand('copy');
+            } catch (err) {
+                console.error('execCommand failed', err);
+            }
+            document.body.removeChild(textArea);
+
+            if (successful) {
+                showToast('日報用テキストをコピーしました！');
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(summaryText).then(() => {
+                    showToast('日報用テキストをコピーしました！');
+                }).catch(() => {
+                    showToast('コピーに失敗しました');
+                });
+            } else {
+                showToast('コピー機能に対応していません');
+            }
+        }
+
+        // トースト通知表示
+        function showToast(message) {
+            let toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toastContainer';
+                toastContainer.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-11/12 max-w-xs';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = 'bg-night-900 border border-amber-500/50 text-amber-300 text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 transform transition-all duration-300 opacity-0 translate-y-2';
+            toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-amber-400"></i><span>${escapeHtml(message)}</span>`;
+
+            toastContainer.appendChild(toast);
+            if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // 初期化処理
+        function initApp() {
+            loadAppState();
+
+            if (typeof window.initFirebaseCloud === 'function') {
+                window.initFirebaseCloud();
+            }
+
+            const loginOverlay = document.getElementById('loginOverlay');
+            if (loginOverlay) {
+                if (appState.isLoggedIn) {
+                    loginOverlay.classList.add('hidden');
+                } else {
+                    loginOverlay.classList.remove('hidden');
+                }
+            }
+
+            const dateInput = document.getElementById('currentDateInput');
+            if (dateInput) {
+                if (!dateInput.value) {
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    dateInput.value = `${yyyy}-${mm}-${dd}`;
+                }
+                appState.currentDate = dateInput.value;
+            }
+
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+
+            renderAll();
+        }
+
+        window.onload = function () {
+            initApp();
+        };
+    </script>
+</body>
+</html>
