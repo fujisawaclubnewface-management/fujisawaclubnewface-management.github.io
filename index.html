@@ -49,7 +49,7 @@
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // 💡 ここにFirebaseコンソールからコピーした本物の設定を貼り付けてください
-        const firebaseConfig = {
+       const firebaseConfig = {
   apiKey: "AIzaSyBRags3gsk7Kuly13rM_jsBDZUy3psptco",
   authDomain: "face-sale-management.firebaseapp.com",
   databaseURL: "https://face-sale-management-default-rtdb.firebaseio.com",
@@ -59,6 +59,7 @@
   appId: "1:140519781819:web:88c09eff8dadf01df2809e",
   measurementId: "G-CT5MV5KVY0"
 };
+
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
 
@@ -1430,14 +1431,20 @@
             if (logId) {
                 const idx = dayData.boyWorkLogs.findIndex(l => l.id === logId);
                 if (idx !== -1) {
-                    dayData.boyWorkLogs[idx] = { id: logId, name, startTime, endTime };
+                    dayData.boyWorkLogs[idx] = { 
+                        ...dayData.boyWorkLogs[idx], 
+                        name, 
+                        startTime, 
+                        endTime 
+                    };
                 }
             } else {
                 dayData.boyWorkLogs.push({
                     id: generateId(),
                     name,
                     startTime,
-                    endTime
+                    endTime,
+                    createdAt: Date.now() // 登録順ソート用のタイムスタンプ
                 });
             }
 
@@ -1466,7 +1473,12 @@
             if (!container) return;
 
             const dayData = getCurrentDayData();
-            const logs = dayData.boyWorkLogs || [];
+            // 登録順（作成日時が古い順）にソート
+            const logs = (dayData.boyWorkLogs || []).slice().sort((a, b) => {
+                const timeA = a.createdAt || 0;
+                const timeB = b.createdAt || 0;
+                return timeA - timeB;
+            });
 
             if (logs.length === 0) {
                 container.innerHTML = `
