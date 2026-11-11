@@ -60,7 +60,6 @@
   measurementId: "G-CT5MV5KVY0"
 };
 
-
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
 
@@ -473,10 +472,15 @@
                         </select>
                     </div>
                     <div class="bg-night-950/80 p-2.5 rounded-2xl border border-gray-800 focus-within:border-amber-500/50 transition-colors">
-                        <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
-                            <i data-lucide="users" class="w-3 h-3 text-amber-400"></i> 客数 (名) <span class="text-rose-400">*</span>
+                        <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center justify-between">
+                            <span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3 text-amber-400"></i> 客数 <span class="text-rose-400">*</span></span>
+                            <span class="text-[9px] text-gray-400 font-normal">名</span>
                         </label>
-                        <input type="number" id="customerCountInput" value="1" min="1" class="w-full bg-transparent text-white font-mono text-base font-extrabold focus:outline-none">
+                        <div class="flex items-center gap-1">
+                            <button type="button" onclick="adjustCustomerCount(-1)" class="w-7 h-7 rounded-xl bg-night-900 hover:bg-night-800 text-gray-300 border border-gray-700/80 flex items-center justify-center font-bold text-xs active:scale-95 transition-transform">-</button>
+                            <input type="number" id="customerCountInput" value="1" min="1" class="w-full bg-transparent text-center text-white font-mono text-base font-extrabold focus:outline-none">
+                            <button type="button" onclick="adjustCustomerCount(1)" class="w-7 h-7 rounded-xl bg-night-900 hover:bg-night-800 text-gray-300 border border-gray-700/80 flex items-center justify-center font-bold text-xs active:scale-95 transition-transform">+</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1098,6 +1102,16 @@
 
         // --- 伝票（Slip）モーダル操作 ---
         let currentChampagneItems = [];
+
+        // 客数の増減処理関数
+        function adjustCustomerCount(amount) {
+            const input = document.getElementById('customerCountInput');
+            if (!input) return;
+            let current = parseInt(input.value, 10) || 1;
+            current += amount;
+            if (current < 1) current = 1;
+            input.value = current;
+        }
 
         // 支払い内訳の残り金額計算
         function calculateRemainingPayment() {
