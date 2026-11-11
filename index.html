@@ -60,6 +60,7 @@
   measurementId: "G-CT5MV5KVY0"
 };
 
+
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
 
@@ -448,7 +449,7 @@
                         <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
                             <i data-lucide="hash" class="w-3 h-3 text-amber-400"></i> 伝票番号 <span class="text-rose-400">*</span>
                         </label>
-                        <input type="text" id="slipNumberInput" placeholder="例: 101" class="w-full bg-transparent text-amber-300 font-mono text-base font-extrabold focus:outline-none placeholder-gray-600">
+                        <input type="text" id="slipNumberInput" pattern="[0-9]*" inputmode="numeric" placeholder="例: 101" class="w-full bg-transparent text-amber-300 font-mono text-base font-extrabold focus:outline-none placeholder-gray-600">
                     </div>
                     <div class="bg-night-950/80 p-2.5 rounded-2xl border border-gray-800 focus-within:border-amber-500/50 transition-colors">
                         <label class="block text-[10px] text-gray-400 font-bold mb-1 flex items-center gap-1">
@@ -477,9 +478,9 @@
                             <span class="text-[9px] text-gray-400 font-normal">名</span>
                         </label>
                         <div class="flex items-center gap-1">
-                            <button type="button" onclick="adjustCustomerCount(-1)" class="w-7 h-7 rounded-xl bg-night-900 hover:bg-night-800 text-gray-300 border border-gray-700/80 flex items-center justify-center font-bold text-xs active:scale-95 transition-transform">-</button>
-                            <input type="number" id="customerCountInput" value="1" min="1" class="w-full bg-transparent text-center text-white font-mono text-base font-extrabold focus:outline-none">
-                            <button type="button" onclick="adjustCustomerCount(1)" class="w-7 h-7 rounded-xl bg-night-900 hover:bg-night-800 text-gray-300 border border-gray-700/80 flex items-center justify-center font-bold text-xs active:scale-95 transition-transform">+</button>
+                            <button type="button" onclick="adjustCustomerCount(-1)" class="w-7 h-7 shrink-0 rounded-xl bg-night-900 hover:bg-night-800 text-gray-200 border border-gray-700 flex items-center justify-center font-bold text-sm active:scale-95 transition-transform">-</button>
+                            <input type="text" id="customerCountInput" value="1" pattern="[0-9]*" inputmode="numeric" class="w-full bg-transparent text-center text-white font-mono text-base font-extrabold focus:outline-none">
+                            <button type="button" onclick="adjustCustomerCount(1)" class="w-7 h-7 shrink-0 rounded-xl bg-night-900 hover:bg-night-800 text-gray-200 border border-gray-700 flex items-center justify-center font-bold text-sm active:scale-95 transition-transform">+</button>
                         </div>
                     </div>
                 </div>
@@ -500,7 +501,7 @@
                     </label>
                     <div class="relative flex items-center">
                         <span class="text-emerald-400 font-mono text-lg font-bold mr-1">¥</span>
-                        <input type="number" id="slipTotalAmountInput" placeholder="0" oninput="updatePaymentAmountsFromTotal()" class="w-full bg-transparent text-emerald-400 font-mono text-xl font-black focus:outline-none placeholder-emerald-900/50">
+                        <input type="text" id="slipTotalAmountInput" pattern="[0-9]*" inputmode="numeric" placeholder="0" oninput="updatePaymentAmountsFromTotal()" class="w-full bg-transparent text-emerald-400 font-mono text-xl font-black focus:outline-none placeholder-emerald-900/50">
                     </div>
                 </div>
 
@@ -531,21 +532,21 @@
                                 <span class="text-[10px] font-bold text-emerald-400">💵 現金</span>
                                 <button type="button" onclick="fillRemainingTo('cash')" title="残額をセット" class="text-[9px] text-emerald-400/80 hover:text-emerald-300 font-bold bg-emerald-500/10 px-1 rounded">残り全額</button>
                             </div>
-                            <input type="number" id="cashPaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                            <input type="text" id="cashPaymentInput" pattern="[0-9]*" inputmode="numeric" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
                         <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-sky-500/50 relative">
                             <div class="flex justify-between items-center mb-0.5">
                                 <span class="text-[10px] font-bold text-sky-400">💳 カード</span>
                                 <button type="button" onclick="fillRemainingTo('card')" title="残額をセット" class="text-[9px] text-sky-400/80 hover:text-sky-300 font-bold bg-sky-500/10 px-1 rounded">残り全額</button>
                             </div>
-                            <input type="number" id="cardPaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                            <input type="text" id="cardPaymentInput" pattern="[0-9]*" inputmode="numeric" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
                         <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-amber-500/50 relative">
                             <div class="flex justify-between items-center mb-0.5">
                                 <span class="text-[10px] font-bold text-amber-400">📝 売掛</span>
                                 <button type="button" onclick="fillRemainingTo('receivable')" title="残額をセット" class="text-[9px] text-amber-400/80 hover:text-amber-300 font-bold bg-amber-500/10 px-1 rounded">残り全額</button>
                             </div>
-                            <input type="number" id="receivablePaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                            <input type="text" id="receivablePaymentInput" pattern="[0-9]*" inputmode="numeric" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
                     </div>
                 </div>
@@ -561,7 +562,7 @@
                         </button>
                     </div>
                     <div id="champagneListContainer" class="space-y-2.5">
-                        <!-- 動的追加 -->
+                        <!-- 動ギフト追加 -->
                     </div>
                 </div>
             </div>
@@ -595,7 +596,7 @@
             <div class="p-4 space-y-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">本日の準備金金額 (円)</label>
-                    <input type="number" id="initialCashInput" placeholder="30000" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
+                    <input type="text" id="initialCashInput" pattern="[0-9]*" inputmode="numeric" placeholder="30000" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
                 </div>
             </div>
             <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-end gap-2">
@@ -696,7 +697,7 @@
 
                 <div>
                     <label class="block text-gray-400 mb-1">金額 (円) <span class="text-rose-400">*</span></label>
-                    <input type="number" id="cashAmountInput" placeholder="0" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
+                    <input type="text" id="cashAmountInput" pattern="[0-9]*" inputmode="numeric" placeholder="0" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-amber-300 font-mono text-base font-bold focus:outline-none focus:border-amber-400">
                 </div>
 
                 <div>
@@ -720,7 +721,6 @@
         </div>
     </div>
 
-    <!-- Modal 5: ボーイ新規追加用モーダル -->
     <div id="addBoyModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="bg-night-card border border-gray-800 w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl">
             <div class="bg-night-900 px-4 py-3 border-b border-gray-800 flex justify-between items-center">
@@ -1299,7 +1299,7 @@
                     </div>
                     <div>
                         <label class="block text-[9px] text-gray-400 font-medium mb-0.5">金額 (円)</label>
-                        <input type="number" value="${item.price || 0}" placeholder="0" oninput="currentChampagneItems[${idx}].price = parseInt(this.value, 10) || 0; currentChampagneItems[${idx}].backRate = 0.1;" class="w-full bg-night-950 border border-gray-700/80 focus:border-emerald-400 text-emerald-400 font-mono text-sm font-extrabold rounded-xl p-2 focus:outline-none">
+                        <input type="text" pattern="[0-9]*" inputmode="numeric" value="${item.price || 0}" placeholder="0" oninput="currentChampagneItems[${idx}].price = parseInt(this.value, 10) || 0; currentChampagneItems[${idx}].backRate = 0.1;" class="w-full bg-night-950 border border-gray-700/80 focus:border-emerald-400 text-emerald-400 font-mono text-sm font-extrabold rounded-xl p-2 focus:outline-none">
                     </div>
                 </div>
             `).join('');
