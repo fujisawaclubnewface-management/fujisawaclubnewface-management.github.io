@@ -1625,11 +1625,16 @@
             if (!container) return;
 
             const dayData = getCurrentDayData();
-            // 登録順（作成日時が古い順）にソート
+            const masterBoys = appState.masterBoys || [];
+            
+            // マスタの並び順（インデックス順）を優先してソート
             const logs = (dayData.boyWorkLogs || []).slice().sort((a, b) => {
-                const timeA = a.createdAt || 0;
-                const timeB = b.createdAt || 0;
-                return timeA - timeB;
+                const indexA = masterBoys.indexOf(a.name);
+                const indexB = masterBoys.indexOf(b.name);
+                const posA = indexA !== -1 ? indexA : 999;
+                const posB = indexB !== -1 ? indexB : 999;
+                if (posA !== posB) return posA - posB;
+                return (a.createdAt || 0) - (b.createdAt || 0);
             });
 
             if (logs.length === 0) {
@@ -1995,7 +2000,16 @@
                 return numA - numB;
             });
             const cashTxs = dayData.cashTransactions || [];
-            const boyLogs = dayData.boyWorkLogs || [];
+            
+            const masterBoys = appState.masterBoys || [];
+            const boyLogs = (dayData.boyWorkLogs || []).slice().sort((a, b) => {
+                const indexA = masterBoys.indexOf(a.name);
+                const indexB = masterBoys.indexOf(b.name);
+                const posA = indexA !== -1 ? indexA : 999;
+                const posB = indexB !== -1 ? indexB : 999;
+                if (posA !== posB) return posA - posB;
+                return (a.createdAt || 0) - (b.createdAt || 0);
+            });
 
             let minNum = Infinity;
             let maxNum = -Infinity;
