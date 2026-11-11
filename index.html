@@ -465,27 +465,52 @@
                     </label>
                     <div class="relative flex items-center">
                         <span class="text-emerald-400 font-mono text-lg font-bold mr-1">¥</span>
-                        <input type="number" id="slipTotalAmountInput" placeholder="0" class="w-full bg-transparent text-emerald-400 font-mono text-xl font-black focus:outline-none placeholder-emerald-900/50">
+                        <input type="number" id="slipTotalAmountInput" placeholder="0" oninput="updatePaymentAmountsFromTotal()" class="w-full bg-transparent text-emerald-400 font-mono text-xl font-black focus:outline-none placeholder-emerald-900/50">
                     </div>
                 </div>
 
-                <!-- 支払い内訳 (カード型レイアウト) -->
+                <!-- 支払い内訳 (一括選択 ＆ 自動併用計算機能) -->
                 <div class="space-y-2 border-t border-gray-800/80 pt-3">
-                    <label class="block text-gray-300 font-bold text-xs flex items-center gap-1.5">
-                        <i data-lucide="credit-card" class="w-3.5 h-3.5 text-amber-400"></i> 支払い種別内訳
-                    </label>
+                    <div class="flex justify-between items-center">
+                        <label class="text-gray-300 font-bold text-xs flex items-center gap-1.5">
+                            <i data-lucide="credit-card" class="w-3.5 h-3.5 text-amber-400"></i> 支払い種別内訳
+                        </label>
+                        <div class="flex gap-1">
+                            <button type="button" onclick="setFullPayment('cash')" class="px-2 py-0.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold transition-all">全額現金</button>
+                            <button type="button" onclick="setFullPayment('card')" class="px-2 py-0.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold transition-all">全額カード</button>
+                            <button type="button" onclick="setFullPayment('receivable')" class="px-2 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold transition-all">全額売掛</button>
+                        </div>
+                    </div>
+
+                    <!-- 未割り当ての残額インジケーター -->
+                    <div id="paymentRemainingInfo" class="bg-night-950/90 border border-sky-500/30 rounded-xl px-3 py-1.5 flex justify-between items-center text-xs">
+                        <span class="text-gray-400 font-medium">振り分け残額:</span>
+                        <div class="flex items-center gap-2">
+                            <span id="paymentRemainingAmount" class="font-mono font-extrabold text-sky-300">¥0</span>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-3 gap-2">
-                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-emerald-500/50">
-                            <span class="block text-[10px] font-bold text-emerald-400 mb-0.5">💵 現金</span>
-                            <input type="number" id="cashPaymentInput" placeholder="0" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-emerald-500/50 relative">
+                            <div class="flex justify-between items-center mb-0.5">
+                                <span class="text-[10px] font-bold text-emerald-400">💵 現金</span>
+                                <button type="button" onclick="fillRemainingTo('cash')" title="残額をセット" class="text-[9px] text-emerald-400/80 hover:text-emerald-300 font-bold bg-emerald-500/10 px-1 rounded">残り全額</button>
+                            </div>
+                            <input type="number" id="cashPaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
-                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-sky-500/50">
-                            <span class="block text-[10px] font-bold text-sky-400 mb-0.5">💳 カード</span>
-                            <input type="number" id="cardPaymentInput" placeholder="0" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-sky-500/50 relative">
+                            <div class="flex justify-between items-center mb-0.5">
+                                <span class="text-[10px] font-bold text-sky-400">💳 カード</span>
+                                <button type="button" onclick="fillRemainingTo('card')" title="残額をセット" class="text-[9px] text-sky-400/80 hover:text-sky-300 font-bold bg-sky-500/10 px-1 rounded">残り全額</button>
+                            </div>
+                            <input type="number" id="cardPaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
-                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-amber-500/50">
-                            <span class="block text-[10px] font-bold text-amber-400 mb-0.5">📝 売掛</span>
-                            <input type="number" id="receivablePaymentInput" placeholder="0" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
+                        <div class="bg-night-950 p-2 rounded-xl border border-gray-800/80 focus-within:border-amber-500/50 relative">
+                            <div class="flex justify-between items-center mb-0.5">
+                                <span class="text-[10px] font-bold text-amber-400">📝 売掛</span>
+                                <button type="button" onclick="fillRemainingTo('receivable')" title="残額をセット" class="text-[9px] text-amber-400/80 hover:text-amber-300 font-bold bg-amber-500/10 px-1 rounded">残り全額</button>
+                            </div>
+                            <input type="number" id="receivablePaymentInput" placeholder="0" oninput="calculateRemainingPayment()" class="w-full bg-transparent text-white font-mono font-bold text-xs focus:outline-none placeholder-gray-700">
                         </div>
                     </div>
                 </div>
@@ -1040,6 +1065,72 @@
         // --- 伝票（Slip）モーダル操作 ---
         let currentChampagneItems = [];
 
+        // 支払い内訳の残り金額計算
+        function calculateRemainingPayment() {
+            const total = parseInt(document.getElementById('slipTotalAmountInput')?.value, 10) || 0;
+            const cash = parseInt(document.getElementById('cashPaymentInput')?.value, 10) || 0;
+            const card = parseInt(document.getElementById('cardPaymentInput')?.value, 10) || 0;
+            const recv = parseInt(document.getElementById('receivablePaymentInput')?.value, 10) || 0;
+
+            const remaining = total - (cash + card + recv);
+            const remainingEl = document.getElementById('paymentRemainingAmount');
+            const infoEl = document.getElementById('paymentRemainingInfo');
+
+            if (remainingEl) {
+                remainingEl.textContent = `¥${remaining.toLocaleString()}`;
+                if (remaining < 0) {
+                    remainingEl.className = 'font-mono font-extrabold text-rose-400';
+                } else if (remaining === 0) {
+                    remainingEl.className = 'font-mono font-extrabold text-emerald-400';
+                } else {
+                    remainingEl.className = 'font-mono font-extrabold text-sky-300';
+                }
+            }
+        }
+
+        // 全額ワンタップ入力
+        function setFullPayment(type) {
+            const total = parseInt(document.getElementById('slipTotalAmountInput')?.value, 10) || 0;
+            const cashInput = document.getElementById('cashPaymentInput');
+            const cardInput = document.getElementById('cardPaymentInput');
+            const recvInput = document.getElementById('receivablePaymentInput');
+
+            if (cashInput) cashInput.value = (type === 'cash') ? (total || '') : '';
+            if (cardInput) cardInput.value = (type === 'card') ? (total || '') : '';
+            if (recvInput) recvInput.value = (type === 'receivable') ? (total || '') : '';
+
+            calculateRemainingPayment();
+        }
+
+        // 残り全額を特定項目へ自動セット
+        function fillRemainingTo(type) {
+            const total = parseInt(document.getElementById('slipTotalAmountInput')?.value, 10) || 0;
+            const cash = type === 'cash' ? 0 : (parseInt(document.getElementById('cashPaymentInput')?.value, 10) || 0);
+            const card = type === 'card' ? 0 : (parseInt(document.getElementById('cardPaymentInput')?.value, 10) || 0);
+            const recv = type === 'receivable' ? 0 : (parseInt(document.getElementById('receivablePaymentInput')?.value, 10) || 0);
+
+            const remaining = total - (cash + card + recv);
+            const targetVal = remaining > 0 ? remaining : 0;
+
+            if (type === 'cash') {
+                const el = document.getElementById('cashPaymentInput');
+                if (el) el.value = targetVal || '';
+            } else if (type === 'card') {
+                const el = document.getElementById('cardPaymentInput');
+                if (el) el.value = targetVal || '';
+            } else if (type === 'receivable') {
+                const el = document.getElementById('receivablePaymentInput');
+                if (el) el.value = targetVal || '';
+            }
+
+            calculateRemainingPayment();
+        }
+
+        // 総額入力時の一括連動
+        function updatePaymentAmountsFromTotal() {
+            calculateRemainingPayment();
+        }
+
         function openSlipModal(slipId = null) {
             if (appState.isLocked) {
                 showToast('レジ締め完了後のため伝票編集はできません');
@@ -1065,10 +1156,10 @@
                     if (slipIdEl) slipIdEl.value = slip.id;
                     if (slipNumEl) slipNumEl.value = slip.slipNumber || '';
                     if (custCountEl) custCountEl.value = slip.customerCount || 1;
-                    if (totalAmtEl) totalAmtEl.value = slip.totalAmount || 0;
-                    if (cashPayEl) cashPayEl.value = slip.cashPayment || 0;
-                    if (cardPayEl) cardPayEl.value = slip.cardPayment || 0;
-                    if (recvPayEl) recvPayEl.value = slip.receivablePayment || 0;
+                    if (totalAmtEl) totalAmtEl.value = slip.totalAmount || '';
+                    if (cashPayEl) cashPayEl.value = slip.cashPayment || '';
+                    if (cardPayEl) cardPayEl.value = slip.cardPayment || '';
+                    if (recvPayEl) recvPayEl.value = slip.receivablePayment || '';
 
                     currentChampagneItems = slip.champagnes ? [...slip.champagnes] : [];
                     if (deleteBtn) deleteBtn.classList.remove('hidden');
@@ -1083,7 +1174,7 @@
                 const recvPayEl = document.getElementById('receivablePaymentInput');
 
                 if (slipIdEl) slipIdEl.value = '';
-                if (slipNumEl) slipNumEl.value = ''; // 伝票番号をデフォルト空欄に設定
+                if (slipNumEl) slipNumEl.value = '';
                 if (custCountEl) custCountEl.value = 1;
                 if (totalAmtEl) totalAmtEl.value = '';
                 if (cashPayEl) cashPayEl.value = '';
@@ -1095,6 +1186,7 @@
             }
 
             renderChampagneRows();
+            calculateRemainingPayment();
             modal.classList.remove('hidden');
         }
 
