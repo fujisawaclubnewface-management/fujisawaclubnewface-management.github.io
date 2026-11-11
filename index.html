@@ -887,11 +887,12 @@
         // ログイン処理
         function handleLoginSubmit(e) {
             e.preventDefault();
-            // 入力されたPINの文字列を確実に取得し、前後の空白や改行を削除する
+            // 入力されたPINを確実に文字列化し、前後の空白や改行を徹底的に除去する
             const inputPin = String(document.getElementById('loginPinInput')?.value || '').trim();
             const correctPin = String(appState.pinCode || '1234').trim();
             const errorMsg = document.getElementById('loginErrorMsg');
 
+            // 比較条件を確実に一致させる
             if (inputPin === correctPin) {
                 appState.isLoggedIn = true;
                 saveAppState();
