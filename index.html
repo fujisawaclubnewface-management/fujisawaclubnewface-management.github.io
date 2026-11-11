@@ -183,7 +183,7 @@
             </div>
             <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
                 <div class="relative">
-                    <input type="password" id="loginPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700/80 rounded-2xl py-3 text-center text-2xl font-mono tracking-widest text-amber-300 focus:outline-none focus:border-amber-400">
+                    <input type="text" id="loginPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700/80 rounded-2xl py-3 text-center text-2xl font-mono tracking-widest text-amber-300 focus:outline-none focus:border-amber-400">
                 </div>
                 <div id="loginErrorMsg" class="text-rose-400 text-xs font-bold hidden">暗証番号が正しくありません</div>
                 <button type="submit" class="w-full bg-gradient-to-r from-amber-500 to-amber-400 text-black font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition-transform">
@@ -624,15 +624,15 @@
             <div class="p-4 space-y-3 text-xs">
                 <div>
                     <label class="block text-gray-400 mb-1">現在の暗証番号</label>
-                    <input type="password" id="currentPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
+                    <input type="text" id="currentPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
                     <label class="block text-gray-400 mb-1">新しい暗証番号 (数字のみ)</label>
-                    <input type="password" id="newPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
+                    <input type="text" id="newPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
                     <label class="block text-gray-400 mb-1">新しい暗証番号 (確認再入力)</label>
-                    <input type="password" id="confirmPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
+                    <input type="text" id="confirmPinInput" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••" class="w-full bg-night-950 border border-gray-700 rounded-lg p-2.5 text-center text-amber-300 font-mono text-lg font-bold focus:outline-none focus:border-amber-400">
                 </div>
             </div>
             <div class="bg-night-900 px-4 py-3 border-t border-gray-800 flex justify-end gap-2">
