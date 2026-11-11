@@ -49,7 +49,7 @@
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // 💡 ここにFirebaseコンソールからコピーした本物の設定を貼り付けてください
-       const firebaseConfig = {
+        const firebaseConfig = {
   apiKey: "AIzaSyBRags3gsk7Kuly13rM_jsBDZUy3psptco",
   authDomain: "face-sale-management.firebaseapp.com",
   databaseURL: "https://face-sale-management-default-rtdb.firebaseio.com",
@@ -59,6 +59,7 @@
   appId: "1:140519781819:web:88c09eff8dadf01df2809e",
   measurementId: "G-CT5MV5KVY0"
 };
+
 
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
@@ -121,9 +122,10 @@
             unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const cloudData = docSnap.data();
-                    if (cloudData && cloudData.state) {
+                    if (cloudData && cloudData.state && cloudData.state.dailyData) {
                         const currentPin = window.appState?.pinCode;
                         const currentKey = window.appState?.storeSyncKey;
+                        // クラウド上のデータを優先し、マージ
                         window.appState = { 
                             ...window.appState, 
                             ...cloudData.state,
@@ -138,7 +140,7 @@
                         }
                     }
                 } else {
-                    // 初回接続時でクラウドにデータがない場合は現在のローカルデータをクラウドへプッシュ
+                    // クラウド上にデータが全く存在しない場合のみ新規書き込み
                     if (typeof window.syncStateToCloud === 'function') {
                         window.syncStateToCloud();
                     }
