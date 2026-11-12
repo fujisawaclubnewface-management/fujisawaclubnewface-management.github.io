@@ -60,7 +60,6 @@
   measurementId: "G-CT5MV5KVY0"
 };
 
-
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
 
@@ -111,27 +110,33 @@
                 unsubscribeSnapshot();
             }
 
-            const storeKey = window.appState?.storeSyncKey || 'nightwork-store-1';
-            const statusEl = document.getElementById('cloudSyncStatus');
+            var storeKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
+            var statusEl = document.getElementById('cloudSyncStatus');
             if (statusEl) {
-                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-400">同期中 (${window.escapeHtml(storeKey)})</span>`;
+                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-400">同期中 (' + window.escapeHtml(storeKey) + ')</span>';
             }
 
-            const docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
+            var docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
             
-            unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+            unsubscribeSnapshot = onSnapshot(docRef, function(docSnap) {
                 if (docSnap.exists()) {
-                    const cloudData = docSnap.data();
-                    if (cloudData && cloudData.state && cloudData.state.dailyData) {
-                        const currentPin = window.appState?.pinCode;
-                        const currentKey = window.appState?.storeSyncKey;
-                        // クラウド上のデータを優先し、マージ
-                        window.appState = { 
-                            ...window.appState, 
-                            ...cloudData.state,
-                            pinCode: currentPin || cloudData.state.pinCode,
-                            storeSyncKey: currentKey || cloudData.state.storeSyncKey
-                        };
+                    var cloudData = docSnap.data();
+                    if (cloudData && cloudData.state) {
+                        var currentPin = (window.appState && window.appState.pinCode) ? window.appState.pinCode : null;
+                        var currentKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : null;
+                        
+                        // Object.assign の代わりに簡易マージ（iOS 12互換）
+                        var newState = {};
+                        for (var key in window.appState) {
+                            if (window.appState.hasOwnProperty(key)) newState[key] = window.appState[key];
+                        }
+                        for (var key in cloudData.state) {
+                            if (cloudData.state.hasOwnProperty(key)) newState[key] = cloudData.state[key];
+                        }
+                        if (currentPin) newState.pinCode = currentPin;
+                        if (currentKey) newState.storeSyncKey = currentKey;
+
+                        window.appState = newState;
                         try {
                             localStorage.setItem('nightwork_app_state', JSON.stringify(window.appState));
                         } catch (e) {}
@@ -140,12 +145,11 @@
                         }
                     }
                 } else {
-                    // クラウド上にデータが全く存在しない場合のみ新規書き込み
                     if (typeof window.syncStateToCloud === 'function') {
                         window.syncStateToCloud();
                     }
                 }
-            }, (error) => {
+            }, function(error) {
                 console.warn("Firestore access error:", error);
                 if (statusEl) {
                     statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400">ローカル動作中</span>';
@@ -156,8 +160,8 @@
         window.syncStateToCloud = async function() {
             if (!window.isCloudReady || !window.db) return;
             try {
-                const storeKey = window.appState?.storeSyncKey || 'nightwork-store-1';
-                const docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
+                var storeKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
+                var docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
                 await setDoc(docRef, {
                     state: window.appState,
                     updatedAt: new Date().toISOString()
@@ -891,16 +895,17 @@
         // ログイン処理
         function handleLoginSubmit(e) {
             e.preventDefault();
-            // 入力されたPINを確実に文字列化し、前後の空白や改行を徹底的に除去する
-            const inputPin = String(document.getElementById('loginPinInput')?.value || '').trim();
-            const correctPin = String(appState.pinCode || '1234').trim();
-            const errorMsg = document.getElementById('loginErrorMsg');
+            var pinInputEl = document.getElementById('loginPinInput');
+            var inputPin = pinInputEl ? pinInputEl.value : '';
+            var errorMsg = document.getElementById('loginErrorMsg');
 
-            // 比較条件を確実に一致させる
-            if (inputPin === correctPin) {
+            var correctPin = appState.pinCode ? String(appState.pinCode).trim() : '1234';
+            var enteredPin = String(inputPin).trim();
+
+            if (enteredPin === correctPin) {
                 appState.isLoggedIn = true;
                 saveAppState();
-                const loginOverlay = document.getElementById('loginOverlay');
+                var loginOverlay = document.getElementById('loginOverlay');
                 if (loginOverlay) loginOverlay.classList.add('hidden');
                 if (errorMsg) errorMsg.classList.add('hidden');
             } else {
@@ -1620,52 +1625,52 @@
             showToast('勤務記録を削除しました');
         }
 
+        // ボーイ勤務記録をマスタ順（プルダウン順）にソートするためのヘルパー
+        function getSortedBoyLogs(logs) {
+            var masterBoys = appState.masterBoys || [];
+            return (logs || []).slice().sort(function(a, b) {
+                var idxA = masterBoys.indexOf(a.name);
+                var idxB = masterBoys.indexOf(b.name);
+                if (idxA === -1) idxA = 999;
+                if (idxB === -1) idxB = 999;
+                return idxA - idxB;
+            });
+        }
+
         function renderBoyLogs() {
-            const container = document.getElementById('boyWorkLogList');
+            var container = document.getElementById('boyWorkLogList');
             if (!container) return;
 
-            const dayData = getCurrentDayData();
-            const masterBoys = appState.masterBoys || [];
-            
-            // マスタの並び順（インデックス順）を優先してソート
-            const logs = (dayData.boyWorkLogs || []).slice().sort((a, b) => {
-                const indexA = masterBoys.indexOf(a.name);
-                const indexB = masterBoys.indexOf(b.name);
-                const posA = indexA !== -1 ? indexA : 999;
-                const posB = indexB !== -1 ? indexB : 999;
-                if (posA !== posB) return posA - posB;
-                return (a.createdAt || 0) - (b.createdAt || 0);
-            });
+            var dayData = getCurrentDayData();
+            var logs = getSortedBoyLogs(dayData.boyWorkLogs);
 
             if (logs.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-8 text-gray-500 text-xs">
-                        本日の勤務記録はまだありません
-                    </div>
-                `;
+                container.innerHTML = 
+                    '<div class="text-center py-8 text-gray-500 text-xs">' +
+                        '本日の勤務記録はまだありません' +
+                    '</div>';
                 return;
             }
 
-            container.innerHTML = logs.map(log => {
-                const duration = calculateWorkHours(log.startTime, log.endTime);
-                return `
-                    <div class="bg-night-card border border-gray-800/80 rounded-xl p-3 flex justify-between items-center hover:border-amber-500/30 transition-all cursor-pointer" onclick="openBoyWorkModal('${log.id}')">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs">
-                                ${escapeHtml(log.name.charAt(0))}
-                            </div>
-                            <div>
-                                <div class="font-bold text-sm text-gray-200">${escapeHtml(log.name)}</div>
-                                <div class="text-xs text-gray-400 font-mono">${escapeHtml(log.startTime || '20:00')} ～ ${escapeHtml(log.endTime || '05:00')}</div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="inline-block px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono text-xs font-bold">
-                                ${duration}
-                            </span>
-                        </div>
-                    </div>
-                `;
+            container.innerHTML = logs.map(function(log) {
+                var duration = calculateWorkHours(log.startTime, log.endTime);
+                return '' +
+                    '<div class="bg-night-card border border-gray-800/80 rounded-xl p-3 flex justify-between items-center hover:border-amber-500/30 transition-all cursor-pointer" onclick="openBoyWorkModal(\'' + log.id + '\')">' +
+                        '<div class="flex items-center gap-3">' +
+                            '<div class="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs">' +
+                                escapeHtml(log.name.charAt(0)) +
+                            '</div>' +
+                            '<div>' +
+                                '<div class="font-bold text-sm text-gray-200">' + escapeHtml(log.name) + '</div>' +
+                                '<div class="text-xs text-gray-400 font-mono">' + escapeHtml(log.startTime || '20:00') + ' ～ ' + escapeHtml(log.endTime || '05:00') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="text-right">' +
+                            '<span class="inline-block px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono text-xs font-bold">' +
+                                duration +
+                            '</span>' +
+                        '</div>' +
+                    '</div>';
             }).join('');
         }
 
@@ -1991,36 +1996,27 @@
             renderSummary();
         }
 
-        // 日報コピールーチン (確実なクリップボード複製機能)
+        // 日報コピールーチン (iOS 12対応)
         function copySummaryToClipboard() {
-            const dayData = getCurrentDayData();
-            const slips = (dayData.slips || []).slice().sort((a, b) => {
-                const numA = parseInt(a.slipNumber, 10) || 0;
-                const numB = parseInt(b.slipNumber, 10) || 0;
+            var dayData = getCurrentDayData();
+            var slips = (dayData.slips || []).slice().sort(function(a, b) {
+                var numA = parseInt(a.slipNumber, 10) || 0;
+                var numB = parseInt(b.slipNumber, 10) || 0;
                 return numA - numB;
             });
-            const cashTxs = dayData.cashTransactions || [];
-            
-            const masterBoys = appState.masterBoys || [];
-            const boyLogs = (dayData.boyWorkLogs || []).slice().sort((a, b) => {
-                const indexA = masterBoys.indexOf(a.name);
-                const indexB = masterBoys.indexOf(b.name);
-                const posA = indexA !== -1 ? indexA : 999;
-                const posB = indexB !== -1 ? indexB : 999;
-                if (posA !== posB) return posA - posB;
-                return (a.createdAt || 0) - (b.createdAt || 0);
-            });
+            var cashTxs = dayData.cashTransactions || [];
+            var boyLogs = getSortedBoyLogs(dayData.boyWorkLogs);
 
-            let minNum = Infinity;
-            let maxNum = -Infinity;
-            let totalCustomers = 0;
-            let totalSales = 0;
-            let totalCashSales = 0;
-            let totalCardSales = 0;
-            let totalReceivableSales = 0;
+            var minNum = Infinity;
+            var maxNum = -Infinity;
+            var totalCustomers = 0;
+            var totalSales = 0;
+            var totalCashSales = 0;
+            var totalCardSales = 0;
+            var totalReceivableSales = 0;
 
-            slips.forEach(s => {
-                const num = parseInt(s.slipNumber, 10);
+            slips.forEach(function(s) {
+                var num = parseInt(s.slipNumber, 10);
                 if (!isNaN(num)) {
                     if (num < minNum) minNum = num;
                     if (num > maxNum) maxNum = num;
@@ -2032,10 +2028,9 @@
                 totalReceivableSales += Number(s.receivablePayment || 0);
             });
 
-            const slipRangeStr = (minNum !== Infinity && maxNum !== -Infinity) ? `${minNum}番～${maxNum}番` : 'なし';
+            var slipRangeStr = (minNum !== Infinity && maxNum !== -Infinity) ? (minNum + '番～' + maxNum + '番') : 'なし';
 
-            // 項目（カテゴリー）ごとにグループ化した出入金テキスト生成
-            const categoryOrder = [
+            var categoryOrder = [
                 '【出金】キャスト日払い',
                 '【出金】ボーイ日払い',
                 '【出金】ボーイバック',
@@ -2044,88 +2039,92 @@
                 '【出金】その他'
             ];
 
-            const groupedTxs = {};
+            var groupedTxs = {};
             if (totalCashSales > 0) {
                 groupedTxs['【入金】現金売上'] = [{ memo: '伝票現金合算', amount: totalCashSales, type: 'in' }];
             }
-            cashTxs.forEach(m => {
-                const groupKey = `${m.type === 'in' ? '【入金】' : '【出金】'}${m.category || 'その他'}`;
+            cashTxs.forEach(function(m) {
+                var groupKey = (m.type === 'in' ? '【入金】' : '【出金】') + (m.category || 'その他');
                 if (!groupedTxs[groupKey]) groupedTxs[groupKey] = [];
                 groupedTxs[groupKey].push(m);
             });
 
-            const sortedGroupEntries = Object.entries(groupedTxs).sort(([keyA, itemsA], [keyB, itemsB]) => {
-                const typeA = itemsA[0]?.type || 'out';
-                const typeB = itemsB[0]?.type || 'out';
+            var sortedGroupEntries = Object.entries ? Object.entries(groupedTxs).sort(function(a, b) {
+                var itemsA = a[1];
+                var itemsB = b[1];
+                var typeA = (itemsA[0] && itemsA[0].type) ? itemsA[0].type : 'out';
+                var typeB = (itemsB[0] && itemsB[0].type) ? itemsB[0].type : 'out';
                 if (typeA === 'in' && typeB !== 'in') return -1;
                 if (typeA !== 'in' && typeB === 'in') return 1;
-                if (typeA === 'in' && typeB === 'in') return keyA.localeCompare(keyB);
-                
-                const indexA = categoryOrder.indexOf(keyA);
-                const indexB = categoryOrder.indexOf(keyB);
-                const posA = indexA !== -1 ? indexA : 999;
-                const posB = indexB !== -1 ? indexB : 999;
-                return posA - posB;
-            });
+                return 0;
+            }) : [];
 
-            let cashDetailsLines = [];
-            sortedGroupEntries.forEach(([groupName, items]) => {
-                const groupTotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-                const isIn = items[0]?.type === 'in';
-                cashDetailsLines.push(`${groupName} [合計: ${isIn ? '+' : '-'}¥${groupTotal.toLocaleString()}]`);
-                items.forEach(item => {
-                    cashDetailsLines.push(`  ・${item.memo ? item.memo + ' ' : ''}¥${Number(item.amount || 0).toLocaleString()}`);
+            var cashDetailsLines = [];
+            sortedGroupEntries.forEach(function(entry) {
+                var groupName = entry[0];
+                var items = entry[1];
+                var groupTotal = items.reduce(function(sum, item) { return sum + Number(item.amount || 0); }, 0);
+                var isIn = items[0] && items[0].type === 'in';
+                cashDetailsLines.push(groupName + ' [合計: ' + (isIn ? '+' : '-') + '¥' + groupTotal.toLocaleString() + ']');
+                items.forEach(function(item) {
+                    cashDetailsLines.push('  ・' + (item.memo ? item.memo + ' ' : '') + '¥' + Number(item.amount || 0).toLocaleString());
                 });
             });
 
-            let boyLines = boyLogs.map(b => `・${b.name}: ${b.startTime}～${b.endTime} (${calculateWorkHours(b.startTime, b.endTime)})`);
+            var boyLines = boyLogs.map(function(b) {
+                return '・' + b.name + ': ' + b.startTime + '～' + b.endTime + ' (' + calculateWorkHours(b.startTime, b.endTime) + ')';
+            });
 
-            // キャスト別バック集計 (10%)
-            let totalChampagneBack = 0;
-            const castBackMap = {};
-            slips.forEach(s => {
-                (s.champagnes || []).forEach(c => {
-                    const cast = c.castName || 'フリー';
-                    const price = Number(c.price) || 0;
-                    const back = Math.floor(price * 0.1);
+            var totalChampagneBack = 0;
+            var castBackMap = {};
+            slips.forEach(function(s) {
+                (s.champagnes || []).forEach(function(c) {
+                    var cast = c.castName || 'フリー';
+                    var price = Number(c.price) || 0;
+                    var back = Math.floor(price * 0.1);
                     totalChampagneBack += back;
                     castBackMap[cast] = (castBackMap[cast] || 0) + back;
                 });
             });
-            let castBackLines = Object.entries(castBackMap).map(([cast, amt]) => `・${cast}: ¥${amt.toLocaleString()}`);
+            
+            var castBackLines = [];
+            for (var castName in castBackMap) {
+                if (castBackMap.hasOwnProperty(castName)) {
+                    castBackLines.push('・' + castName + ': ¥' + castBackMap[castName].toLocaleString());
+                }
+            }
 
-            let cashInTotal = 0;
-            let cashOutTotal = 0;
-            cashTxs.forEach(t => {
+            var cashInTotal = 0;
+            var cashOutTotal = 0;
+            cashTxs.forEach(function(t) {
                 if (t.type === 'in') cashInTotal += Number(t.amount || 0);
                 if (t.type === 'out') cashOutTotal += Number(t.amount || 0);
             });
 
-            const initialCash = dayData.initialCash || 0;
-            const expectedCash = initialCash + totalCashSales + cashInTotal - cashOutTotal - totalChampagneBack;
+            var initialCash = dayData.initialCash || 0;
+            var expectedCash = initialCash + totalCashSales + cashInTotal - cashOutTotal - totalChampagneBack;
 
-            let summaryText = `【本日の日報 (${appState.currentDate})】\n`;
-            summaryText += `-------------------\n`;
-            summaryText += `■ 本日売上総額: ¥${totalSales.toLocaleString()}\n`;
-            summaryText += `  ・現金売上   : ¥${totalCashSales.toLocaleString()}\n`;
-            summaryText += `  ・カード売上 : ¥${totalCardSales.toLocaleString()}\n`;
-            summaryText += `  ・売掛金     : ¥${totalReceivableSales.toLocaleString()}\n`;
-            summaryText += `-------------------\n`;
-            summaryText += `■ レジドロアー現金残: ¥${expectedCash.toLocaleString()}\n`;
-            summaryText += `  (準備金¥${initialCash.toLocaleString()} + 現金売上¥${totalCashSales.toLocaleString()} + 入金¥${cashInTotal.toLocaleString()} - 出金¥${cashOutTotal.toLocaleString()} - バック¥${totalChampagneBack.toLocaleString()})\n`;
-            summaryText += `-------------------\n`;
-            summaryText += `■ 伝票番号   : ${slipRangeStr}\n`;
-            summaryText += `■ 来店組数   : ${slips.length}組\n`;
-            summaryText += `■ 総客数     : ${totalCustomers}名\n`;
-            summaryText += `-------------------\n`;
-            summaryText += `【入出金明細 (項目別)】\n${cashDetailsLines.length > 0 ? cashDetailsLines.join('\n') : '・なし'}\n`;
-            summaryText += `-------------------\n`;
-            summaryText += `【シャンパンバック内訳 (10%) - 合計: ¥${totalChampagneBack.toLocaleString()}】\n${castBackLines.length > 0 ? castBackLines.join('\n') : '・なし'}\n`;
-            summaryText += `-------------------\n`;
-            summaryText += `【ボーイ勤務記録】\n${boyLines.length > 0 ? boyLines.join('\n') : '・なし'}\n`;
+            var summaryText = '【本日の日報 (' + appState.currentDate + ')】\n';
+            summaryText += '-------------------\n';
+            summaryText += '■ 本日売上総額: ¥' + totalSales.toLocaleString() + '\n';
+            summaryText += '  ・現金売上   : ¥' + totalCashSales.toLocaleString() + '\n';
+            summaryText += '  ・カード売上 : ¥' + totalCardSales.toLocaleString() + '\n';
+            summaryText += '  ・売掛金     : ¥' + totalReceivableSales.toLocaleString() + '\n';
+            summaryText += '-------------------\n';
+            summaryText += '■ レジドロアー現金残: ¥' + expectedCash.toLocaleString() + '\n';
+            summaryText += '  (準備金¥' + initialCash.toLocaleString() + ' + 現金売上¥' + totalCashSales.toLocaleString() + ' + 入金¥' + cashInTotal.toLocaleString() + ' - 出金¥' + cashOutTotal.toLocaleString() + ' - バック¥' + totalChampagneBack.toLocaleString() + ')\n';
+            summaryText += '-------------------\n';
+            summaryText += '■ 伝票番号   : ' + slipRangeStr + '\n';
+            summaryText += '■ 来店組数   : ' + slips.length + '組\n';
+            summaryText += '■ 総客数     : ' + totalCustomers + '名\n';
+            summaryText += '-------------------\n';
+            summaryText += '【入出金明細 (項目別)】\n' + (cashDetailsLines.length > 0 ? cashDetailsLines.join('\n') : '・なし') + '\n';
+            summaryText += '-------------------\n';
+            summaryText += '【シャンパンバック内訳 (10%) - 合計: ¥' + totalChampagneBack.toLocaleString() + '】\n' + (castBackLines.length > 0 ? castBackLines.join('\n') : '・なし') + '\n';
+            summaryText += '-------------------\n';
+            summaryText += '【ボーイ勤務記録】\n' + (boyLines.length > 0 ? boyLines.join('\n') : '・なし') + '\n';
 
-            // フォールバック付きテキストコピー処理
-            const textArea = document.createElement('textarea');
+            var textArea = document.createElement('textarea');
             textArea.value = summaryText;
             textArea.style.position = 'fixed';
             textArea.style.left = '-9999px';
@@ -2134,7 +2133,7 @@
             textArea.focus();
             textArea.select();
 
-            let successful = false;
+            var successful = false;
             try {
                 successful = document.execCommand('copy');
             } catch (err) {
@@ -2145,9 +2144,9 @@
             if (successful) {
                 showToast('日報用テキストをコピーしました！');
             } else if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(summaryText).then(() => {
+                navigator.clipboard.writeText(summaryText).then(function() {
                     showToast('日報用テキストをコピーしました！');
-                }).catch(() => {
+                }).catch(function() {
                     showToast('コピーに失敗しました');
                 });
             } else {
