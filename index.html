@@ -33,7 +33,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
-        /* iOS 12向けflex・gridおよび背景フォールバック */
+        /* flex・gridおよび背景フォールバック */
         .bg-night-950 { background-color: #090a0f; }
         .bg-night-900 { background-color: #121520; }
         .bg-night-800 { background-color: #1c2030; }
@@ -52,27 +52,135 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 💡 ここにFirebaseコンソールからコピーした本物の設定を貼り付けてください
         const firebaseConfig = {
-  apiKey: "AIzaSyBRags3gsk7Kuly13rM_jsBDZUy3psptco",
-  authDomain: "face-sale-management.firebaseapp.com",
-  databaseURL: "https://face-sale-management-default-rtdb.firebaseio.com",
-  projectId: "face-sale-management",
-  storageBucket: "face-sale-management.firebasestorage.app",
-  messagingSenderId: "140519781819",
-  appId: "1:140519781819:web:88c09eff8dadf01df2809e",
-  measurementId: "G-CT5MV5KVY0"
-};
+            apiKey: "AIzaSyBRags3gsk7Kuly13rM_jsBDZUy3psptco",
+            authDomain: "face-sale-management.firebaseapp.com",
+            databaseURL: "https://face-sale-management-default-rtdb.firebaseio.com",
+            projectId: "face-sale-management",
+            storageBucket: "face-sale-management.firebasestorage.app",
+            messagingSenderId: "140519781819",
+            appId: "1:140519781819:web:88c09eff8dadf01df2809e",
+            measurementId: "G-CT5MV5KVY0"
+        };
 
         const defaultAppId = 'nightwork-register-app';
         let unsubscribeSnapshot = null;
+        window.isInitialSyncDone = false;
+        let pendingSyncDates = new Set();
+
+        // レコード配列をID単位で非破壊マージするヘルパー
+        function mergeRecordArray(localArr, cloudArr, deletedSet) {
+            const map = new Map();
+            (cloudArr || []).forEach(item => {
+                if (item && item.id && !deletedSet.has(item.id)) {
+                    map.set(item.id, item);
+                }
+            });
+            (localArr || []).forEach(item => {
+                if (item && item.id && !deletedSet.has(item.id)) {
+                    const existing = map.get(item.id);
+                    if (!existing) {
+                        map.set(item.id, item);
+                    } else {
+                        const localTime = Number(item.updatedAt || 0);
+                        const cloudTime = Number(existing.updatedAt || 0);
+                        if (localTime > cloudTime) {
+                            map.set(item.id, item);
+                        }
+                    }
+                }
+            });
+            return Array.from(map.values());
+        }
+
+        // 1日分のデータを非破壊マージするヘルパー
+        function mergeDayData(localDay, cloudDay) {
+            const l = localDay || {};
+            const c = cloudDay || {};
+
+            const deletedSet = new Set([
+                ...(Array.isArray(l.deletedIds) ? l.deletedIds : []),
+                ...(Array.isArray(c.deletedIds) ? c.deletedIds : [])
+            ]);
+            // 履歴が肥大化しすぎないよう最新300件を保持
+            const mergedDeletedIds = Array.from(deletedSet).slice(-300);
+
+            const localUpdated = Number(l.updatedAt || 0);
+            const cloudUpdated = Number(c.updatedAt || 0);
+
+            // 準備金は更新時刻が新しい方、または0以外の有効値を優先
+            let mergedInitialCash = Number(c.initialCash || 0);
+            if (localUpdated > cloudUpdated && l.initialCash !== undefined) {
+                mergedInitialCash = Number(l.initialCash || 0);
+            } else if (c.initialCash === undefined && l.initialCash !== undefined) {
+                mergedInitialCash = Number(l.initialCash || 0);
+            }
+
+            return {
+                slips: mergeRecordArray(l.slips, c.slips, deletedSet),
+                cashTransactions: mergeRecordArray(l.cashTransactions, c.cashTransactions, deletedSet),
+                boyWorkLogs: mergeRecordArray(l.boyWorkLogs, c.boyWorkLogs, deletedSet),
+                initialCash: mergedInitialCash,
+                isLocked: localUpdated > cloudUpdated ? Boolean(l.isLocked) : Boolean(c.isLocked),
+                deletedIds: mergedDeletedIds,
+                updatedAt: Math.max(localUpdated, cloudUpdated)
+            };
+        }
+
+        // クラウドからの受信データをローカル状態へ安全に統合
+        function applyCloudStateSafely(cloudState) {
+            if (!cloudState) return;
+            const currentState = window.appState || {};
+            const localDaily = currentState.dailyData || {};
+            const cloudDaily = cloudState.dailyData || {};
+
+            const allDates = new Set([
+                ...Object.keys(localDaily),
+                ...Object.keys(cloudDaily)
+            ]);
+
+            const mergedDailyData = {};
+            allDates.forEach(dateKey => {
+                mergedDailyData[dateKey] = mergeDayData(localDaily[dateKey], cloudDaily[dateKey]);
+            });
+
+            // ボーイ・キャストマスタも重複なく統合
+            const mergedBoys = Array.from(new Set([
+                ...(Array.isArray(cloudState.masterBoys) ? cloudState.masterBoys : []),
+                ...(Array.isArray(currentState.masterBoys) ? currentState.masterBoys : [])
+            ]));
+            const mergedGirls = Array.from(new Set([
+                ...(Array.isArray(cloudState.masterGirls) ? cloudState.masterGirls : []),
+                ...(Array.isArray(currentState.masterGirls) ? currentState.masterGirls : [])
+            ]));
+
+            // 端末固有の認証・表示日付は維持し、共有データのみ更新
+            window.appState = {
+                ...currentState,
+                masterBoys: mergedBoys.length > 0 ? mergedBoys : currentState.masterBoys,
+                masterGirls: mergedGirls.length > 0 ? mergedGirls : currentState.masterGirls,
+                dailyData: mergedDailyData
+            };
+
+            // ローカル参照も同期
+            if (typeof window.syncLocalAppStateRef === 'function') {
+                window.syncLocalAppStateRef(window.appState);
+            }
+
+            try {
+                localStorage.setItem('nightwork_app_state', JSON.stringify(window.appState));
+            } catch (e) {}
+
+            if (typeof window.renderAll === 'function') {
+                window.renderAll();
+            }
+        }
 
         window.initFirebaseCloud = async function() {
             try {
                 if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ここに取得した")) {
-                    console.warn("Firebase config is using placeholder. Realtime sync disabled.");
                     const statusEl = document.getElementById('cloudSyncStatus');
                     if (statusEl) {
                         statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400">キー未設定(ローカル)</span>';
@@ -84,11 +192,10 @@
                 const auth = getAuth(app);
                 const db = getFirestore(app);
 
-                // Handle network/offline errors gracefully without crashing
                 try {
                     await signInAnonymously(auth);
                 } catch (authErr) {
-                    console.warn("Anonymous auth failed (network or offline), operating in offline/local fallback mode:", authErr);
+                    console.warn("Anonymous auth failed, operating in offline mode:", authErr);
                     const statusEl = document.getElementById('cloudSyncStatus');
                     if (statusEl) {
                         statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400">オフライン(ローカル動作中)</span>';
@@ -99,7 +206,7 @@
                 window.db = db;
                 window.isCloudReady = true;
                 
-                window.connectCloudSync();
+                await window.connectCloudSync();
             } catch (e) {
                 console.error("Firebase init failed:", e);
                 const statusEl = document.getElementById('cloudSyncStatus');
@@ -109,50 +216,63 @@
             }
         };
 
-        window.connectCloudSync = function() {
+        window.connectCloudSync = async function() {
             if (!window.isCloudReady || !window.db) return;
             
             if (unsubscribeSnapshot) {
                 unsubscribeSnapshot();
+                unsubscribeSnapshot = null;
             }
 
-            var storeKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
-            var statusEl = document.getElementById('cloudSyncStatus');
+            // 新しいキーへ接続完了するまで空データでの上書きを厳禁にする
+            window.isInitialSyncDone = false;
+
+            const storeKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
+            const statusEl = document.getElementById('cloudSyncStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span><span class="text-sky-300">データ読込中...</span>';
+            }
+
+            const docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
+
+            // 1. まずサーバーから現在のデータを確実に1回取得して保護・統合する
+            try {
+                const initialSnap = await getDoc(docRef);
+                if (initialSnap.exists()) {
+                    const cloudData = initialSnap.data();
+                    if (cloudData && cloudData.state) {
+                        applyCloudStateSafely(cloudData.state);
+                    }
+                }
+            } catch (initReadErr) {
+                console.warn("Initial cloud fetch warning:", initReadErr);
+            }
+
+            window.isInitialSyncDone = true;
+
             if (statusEl) {
                 statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-400">同期中 (' + window.escapeHtml(storeKey) + ')</span>';
             }
 
-            var docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
-            
+            // 読込中に保留されていた変更があればクラウドへ反映
+            if (pendingSyncDates.size > 0) {
+                const datesToFlush = Array.from(pendingSyncDates);
+                pendingSyncDates.clear();
+                for (const d of datesToFlush) {
+                    await window.syncStateToCloud(d);
+                }
+            }
+
+            // 2. リアルタイム監視リスナーを開始
             unsubscribeSnapshot = onSnapshot(docRef, function(docSnap) {
                 if (docSnap.exists()) {
-                    var cloudData = docSnap.data();
+                    const cloudData = docSnap.data();
                     if (cloudData && cloudData.state) {
-                        var currentPin = (window.appState && window.appState.pinCode) ? window.appState.pinCode : '1234';
-                        var currentKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
-                        var currentLoginStatus = (window.appState && window.appState.isLoggedIn) ? window.appState.isLoggedIn : false;
-                        
-                        // クラウド上のデータをそのまま受け取りつつ、端末ごとのローカル認証設定や同期キーを維持
-                        var newState = {};
-                        for (var key in cloudData.state) {
-                            if (cloudData.state.hasOwnProperty(key)) newState[key] = cloudData.state[key];
-                        }
-                        newState.pinCode = currentPin;
-                        newState.storeSyncKey = currentKey;
-                        newState.isLoggedIn = currentLoginStatus;
-
-                        window.appState = newState;
-                        try {
-                            localStorage.setItem('nightwork_app_state', JSON.stringify(window.appState));
-                        } catch (e) {}
-                        if (typeof window.renderAll === 'function') {
-                            window.renderAll();
-                        }
+                        applyCloudStateSafely(cloudData.state);
                     }
-                } else {
-                    if (typeof window.syncStateToCloud === 'function') {
-                        window.syncStateToCloud();
-                    }
+                }
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-400">同期中 (' + window.escapeHtml(storeKey) + ')</span>';
                 }
             }, function(error) {
                 console.warn("Firestore access error:", error);
@@ -162,13 +282,35 @@
             });
         };
 
-        window.syncStateToCloud = async function() {
+        window.syncStateToCloud = async function(targetDate) {
             if (!window.isCloudReady || !window.db) return;
+
+            const dateKey = targetDate || window.appState?.currentDate;
+
+            // 初回クラウド読込が完了する前は、新端末の空データでクラウドを上書きしないよう保留する
+            if (!window.isInitialSyncDone) {
+                if (dateKey) pendingSyncDates.add(dateKey);
+                return;
+            }
+
             try {
-                var storeKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
-                var docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
+                const storeKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
+                const docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
+
+                // 過去の日付データを上書きしないよう、変更対象の日付データのみピンポイントでマージ送信する
+                const payloadState = {
+                    masterBoys: window.appState.masterBoys || [],
+                    masterGirls: window.appState.masterGirls || []
+                };
+
+                if (dateKey && window.appState.dailyData && window.appState.dailyData[dateKey]) {
+                    payloadState.dailyData = {
+                        [dateKey]: window.appState.dailyData[dateKey]
+                    };
+                }
+
                 await setDoc(docRef, {
-                    state: window.appState,
+                    state: payloadState,
                     updatedAt: new Date().toISOString()
                 }, { merge: true });
             } catch (e) {
@@ -833,6 +975,22 @@
             }
         }
 
+        // クラウドマージ後の参照同期用
+        window.syncLocalAppStateRef = function(mergedState) {
+            appState = mergedState;
+            window.appState = appState;
+        };
+
+        // 端末ローカルのみに保存（ログイン・日付変更などでクラウドを上書きしない）
+        function saveLocalStateOnly() {
+            try {
+                localStorage.setItem('nightwork_app_state', JSON.stringify(appState));
+                window.appState = appState;
+            } catch (e) {
+                console.error('Failed to save local state', e);
+            }
+        }
+
         // 同期キー設定モーダル操作
         function openSyncKeyModal() {
             const modal = document.getElementById('syncKeyModal');
@@ -853,7 +1011,8 @@
                 return;
             }
             appState.storeSyncKey = input;
-            saveAppState();
+            window.isInitialSyncDone = false;
+            saveLocalStateOnly();
             closeSyncKeyModal();
 
             if (typeof window.connectCloudSync === 'function') {
@@ -892,12 +1051,12 @@
             }
 
             appState.pinCode = newPin;
-            saveAppState();
+            saveLocalStateOnly();
             closePinConfigModal();
             showToast('暗証番号を変更しました');
         }
 
-        // ログイン処理
+        // ログイン処理（ローカルのみ更新し、クラウドの過去データを絶対に上書きしない）
         function handleLoginSubmit(e) {
             e.preventDefault();
             var pinInputEl = document.getElementById('loginPinInput');
@@ -909,7 +1068,7 @@
 
             if (enteredPin === correctPin) {
                 appState.isLoggedIn = true;
-                saveAppState();
+                saveLocalStateOnly();
                 var loginOverlay = document.getElementById('loginOverlay');
                 if (loginOverlay) loginOverlay.classList.add('hidden');
                 if (errorMsg) errorMsg.classList.add('hidden');
@@ -920,19 +1079,19 @@
 
         function logout() {
             appState.isLoggedIn = false;
-            saveAppState();
+            saveLocalStateOnly();
             const loginOverlay = document.getElementById('loginOverlay');
             if (loginOverlay) loginOverlay.classList.remove('hidden');
             showToast('ログアウトしました');
         }
 
-        // ローカルストレージおよびクラウド保存
-        function saveAppState() {
+        // ローカルストレージおよびクラウド保存（対象日付のみ安全に同期）
+        function saveAppState(targetDate) {
             try {
                 localStorage.setItem('nightwork_app_state', JSON.stringify(appState));
                 window.appState = appState;
                 if (typeof window.syncStateToCloud === 'function') {
-                    window.syncStateToCloud();
+                    window.syncStateToCloud(targetDate || appState.currentDate);
                 }
             } catch (e) {
                 console.error('Failed to save state', e);
@@ -941,13 +1100,14 @@
 
         // 本日のデータ取得
         function getCurrentDayData() {
-            if (!appState.currentDate) return { slips: [], cashTransactions: [], boyWorkLogs: [], initialCash: 0 };
+            if (!appState.currentDate) return { slips: [], cashTransactions: [], boyWorkLogs: [], initialCash: 0, deletedIds: [] };
             if (!appState.dailyData[appState.currentDate]) {
                 appState.dailyData[appState.currentDate] = {
                     slips: [],
                     cashTransactions: [],
                     boyWorkLogs: [],
-                    initialCash: 0
+                    initialCash: 0,
+                    deletedIds: []
                 };
             }
             return appState.dailyData[appState.currentDate];
@@ -970,11 +1130,11 @@
         }
         window.escapeHtml = escapeHtml;
 
-        // 日付変更時ハンドラ
+        // 日付変更時ハンドラ（表示日付の切り替えはローカルのみ保存）
         function onDateChange(newDate) {
             if (!newDate) return;
             appState.currentDate = newDate;
-            saveAppState();
+            saveLocalStateOnly();
             renderAll();
         }
 
@@ -1075,7 +1235,10 @@
 
         function toggleSummaryLock() {
             appState.isLocked = !appState.isLocked;
-            saveAppState();
+            const dayData = getCurrentDayData();
+            dayData.isLocked = appState.isLocked;
+            dayData.updatedAt = Date.now();
+            saveAppState(appState.currentDate);
             updateLockUI();
             showToast(appState.isLocked ? '本日分のレジ締めを完了しました' : 'レジ締めロックを解除しました');
         }
@@ -1103,8 +1266,9 @@
             const val = parseInt(input.value, 10) || 0;
             const dayData = getCurrentDayData();
             dayData.initialCash = val;
+            dayData.updatedAt = Date.now();
 
-            saveAppState();
+            saveAppState(appState.currentDate);
             closeInitialCashModal();
             renderSummary();
             showToast(`準備金を ¥${val.toLocaleString()} に設定しました`);
@@ -1354,7 +1518,8 @@
                 cashPayment,
                 cardPayment,
                 receivablePayment,
-                champagnes: processedChampagnes
+                champagnes: processedChampagnes,
+                updatedAt: Date.now()
             };
 
             if (slipId) {
@@ -1363,8 +1528,9 @@
             } else {
                 dayData.slips.push(slipData);
             }
+            dayData.updatedAt = Date.now();
 
-            saveAppState();
+            saveAppState(appState.currentDate);
             closeSlipModal();
             renderAll();
             showToast('伝票を保存しました');
@@ -1376,8 +1542,11 @@
 
             const dayData = getCurrentDayData();
             dayData.slips = (dayData.slips || []).filter(s => s.id !== slipId);
+            if (!Array.isArray(dayData.deletedIds)) dayData.deletedIds = [];
+            if (!dayData.deletedIds.includes(slipId)) dayData.deletedIds.push(slipId);
+            dayData.updatedAt = Date.now();
 
-            saveAppState();
+            saveAppState(appState.currentDate);
             closeSlipModal();
             renderAll();
             showToast('伝票を削除しました');
@@ -1469,7 +1638,7 @@
             if (txId) {
                 const idx = dayData.cashTransactions.findIndex(t => t.id === txId);
                 if (idx !== -1) {
-                    dayData.cashTransactions[idx] = { id: txId, type, category, amount, memo };
+                    dayData.cashTransactions[idx] = { id: txId, type, category, amount, memo, updatedAt: Date.now() };
                 }
             } else {
                 dayData.cashTransactions.push({
@@ -1477,11 +1646,13 @@
                     type,
                     category,
                     amount,
-                    memo
+                    memo,
+                    updatedAt: Date.now()
                 });
             }
+            dayData.updatedAt = Date.now();
 
-            saveAppState();
+            saveAppState(appState.currentDate);
             closeCashModal();
             renderAll();
             showToast('出入金記録を保存しました');
@@ -1493,8 +1664,11 @@
 
             const dayData = getCurrentDayData();
             dayData.cashTransactions = (dayData.cashTransactions || []).filter(s => s.id !== txId);
+            if (!Array.isArray(dayData.deletedIds)) dayData.deletedIds = [];
+            if (!dayData.deletedIds.includes(txId)) dayData.deletedIds.push(txId);
+            dayData.updatedAt = Date.now();
 
-            saveAppState();
+            saveAppState(appState.currentDate);
             closeCashModal();
             renderAll();
             showToast('出入金記録を削除しました');
@@ -1597,7 +1771,8 @@
                         ...dayData.boyWorkLogs[idx], 
                         name, 
                         startTime, 
-                        endTime 
+                        endTime,
+                        updatedAt: Date.now()
                     };
                 }
             } else {
@@ -1606,11 +1781,13 @@
                     name,
                     startTime,
                     endTime,
-                    createdAt: Date.now() // 登録順ソート用のタイムスタンプ
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
                 });
             }
+            dayData.updatedAt = Date.now();
 
-            saveAppState();
+            saveAppState(appState.currentDate);
             closeBoyWorkModal();
             renderBoyLogs();
             showToast('勤務記録を保存しました');
@@ -1623,8 +1800,11 @@
 
             const dayData = getCurrentDayData();
             dayData.boyWorkLogs = (dayData.boyWorkLogs || []).filter(l => l.id !== logId);
+            if (!Array.isArray(dayData.deletedIds)) dayData.deletedIds = [];
+            if (!dayData.deletedIds.includes(logId)) dayData.deletedIds.push(logId);
+            dayData.updatedAt = Date.now();
 
-            saveAppState();
+            saveAppState(appState.currentDate);
             closeBoyWorkModal();
             renderBoyLogs();
             showToast('勤務記録を削除しました');
