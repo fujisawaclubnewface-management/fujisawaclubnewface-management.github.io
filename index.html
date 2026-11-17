@@ -156,9 +156,13 @@
                 ...(Array.isArray(currentState.masterGirls) ? currentState.masterGirls : [])
             ]));
 
-            // 端末固有の認証・表示日付は維持し、共有データのみ更新
+            // クラウド上のPINコードが存在すれば同期、なければローカル維持
+            const syncedPinCode = cloudState.pinCode ? cloudState.pinCode : currentState.pinCode;
+
+            // 端末固有の表示日付は維持し、共有データ（売上・マスタ・PIN）を更新
             window.appState = {
                 ...currentState,
+                pinCode: syncedPinCode,
                 masterBoys: mergedBoys.length > 0 ? mergedBoys : currentState.masterBoys,
                 masterGirls: mergedGirls.length > 0 ? mergedGirls : currentState.masterGirls,
                 dailyData: mergedDailyData
@@ -297,8 +301,9 @@
                 const storeKey = (window.appState && window.appState.storeSyncKey) ? window.appState.storeSyncKey : 'nightwork-store-1';
                 const docRef = doc(window.db, 'artifacts', defaultAppId, 'public', 'data', 'nightwork_store_data', storeKey);
 
-                // 過去の日付データを上書きしないよう、変更対象の日付データのみピンポイントでマージ送信する
+                // 共有設定（PINコード・マスタ）および対象日付データを送信
                 const payloadState = {
+                    pinCode: window.appState.pinCode || '1234',
                     masterBoys: window.appState.masterBoys || [],
                     masterGirls: window.appState.masterGirls || []
                 };
@@ -330,7 +335,6 @@
                 </div>
                 <h2 class="text-lg font-bold text-gray-100">店舗ログイン認証</h2>
                 <p class="text-xs text-gray-400">暗証番号 (PIN) を入力してください</p>
-                <p class="text-[10px] text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg py-1 px-2">初期暗証番号: <span class="font-mono font-bold text-amber-300">1234</span></p>
             </div>
             <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
                 <div class="relative">
@@ -546,10 +550,142 @@
             </button>
         </section>
 
+        <!-- TAB 5: 期間別売上集計 (週間・月間・期間指定) -->
+        <section id="tab-period" class="space-y-4 hidden">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="calendar-range" class="w-4 h-4 text-amber-400"></i> 期間別売上集計
+                </h2>
+                <span class="text-[10px] text-gray-400 bg-night-800 border border-gray-700/70 px-2 py-0.5 rounded-lg">入出金抜き純売上</span>
+            </div>
+
+            <!-- 集計モード切替 & 期間選択コントロール -->
+            <div class="bg-night-card border border-gray-800/90 rounded-2xl p-3.5 shadow-xl space-y-3">
+                <!-- モード切替タブ (週間 / 月間 / 期間指定) -->
+                <div class="grid grid-cols-3 gap-1.5 bg-night-950 p-1 rounded-xl border border-gray-800">
+                    <button type="button" id="periodModeBtn-week" onclick="setPeriodType('week')" class="py-2 rounded-lg text-xs font-extrabold bg-amber-500 text-black shadow transition-all">
+                        週間
+                    </button>
+                    <button type="button" id="periodModeBtn-month" onclick="setPeriodType('month')" class="py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-gray-200 transition-all">
+                        月間
+                    </button>
+                    <button type="button" id="periodModeBtn-custom" onclick="setPeriodType('custom')" class="py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-gray-200 transition-all">
+                        期間指定
+                    </button>
+                </div>
+
+                <!-- 週間コントロール -->
+                <div id="periodControl-week" class="space-y-2">
+                    <div class="flex items-center justify-between gap-1.5">
+                        <button type="button" onclick="shiftPeriodWeek(-1)" class="px-2.5 py-2 rounded-xl bg-night-800 hover:bg-night-700 border border-gray-700 text-xs font-bold text-gray-200 active:scale-95 transition-transform shrink-0">
+                            &lt; 前週
+                        </button>
+                        <input type="date" id="periodWeekRefDate" onchange="onPeriodWeekDateChange(this.value)" class="flex-1 bg-night-950 border border-gray-700/80 rounded-xl px-2.5 py-1.5 text-xs text-center text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400">
+                        <button type="button" onclick="shiftPeriodWeek(1)" class="px-2.5 py-2 rounded-xl bg-night-800 hover:bg-night-700 border border-gray-700 text-xs font-bold text-gray-200 active:scale-95 transition-transform shrink-0">
+                            次週 &gt;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 月間コントロール -->
+                <div id="periodControl-month" class="space-y-2 hidden">
+                    <div class="flex items-center justify-between gap-1.5">
+                        <button type="button" onclick="shiftPeriodMonth(-1)" class="px-2.5 py-2 rounded-xl bg-night-800 hover:bg-night-700 border border-gray-700 text-xs font-bold text-gray-200 active:scale-95 transition-transform shrink-0">
+                            &lt; 前月
+                        </button>
+                        <input type="month" id="periodMonthInput" onchange="onPeriodMonthChange(this.value)" class="flex-1 bg-night-950 border border-gray-700/80 rounded-xl px-2.5 py-1.5 text-xs text-center text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400">
+                        <button type="button" onclick="shiftPeriodMonth(1)" class="px-2.5 py-2 rounded-xl bg-night-800 hover:bg-night-700 border border-gray-700 text-xs font-bold text-gray-200 active:scale-95 transition-transform shrink-0">
+                            次月 &gt;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 期間指定コントロール -->
+                <div id="periodControl-custom" class="space-y-2 hidden">
+                    <div class="grid grid-cols-11 items-center gap-1">
+                        <input type="date" id="periodStartDateInput" onchange="renderPeriodSummary()" class="col-span-5 bg-night-950 border border-gray-700/80 rounded-xl px-2 py-1.5 text-[11px] text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400">
+                        <span class="col-span-1 text-center text-gray-400 font-bold text-xs">～</span>
+                        <input type="date" id="periodEndDateInput" onchange="renderPeriodSummary()" class="col-span-5 bg-night-950 border border-gray-700/80 rounded-xl px-2 py-1.5 text-[11px] text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+
+                <!-- 対象期間表示ラベル -->
+                <div class="bg-night-950/90 border border-amber-500/20 rounded-xl px-3 py-2 flex items-center justify-between text-xs">
+                    <span class="text-gray-400 font-medium flex items-center gap-1">
+                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-400"></i> 集計対象:
+                    </span>
+                    <span id="periodRangeDisplay" class="font-mono font-bold text-amber-300">-</span>
+                </div>
+            </div>
+
+            <!-- 期間売上総額カード -->
+            <div class="bg-gradient-to-br from-emerald-950/40 via-night-card to-night-900 border border-emerald-500/30 p-4 rounded-2xl shadow-lg relative overflow-hidden space-y-2">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-bl-full pointer-events-none"></div>
+                <div class="flex justify-between items-center">
+                    <div class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                        <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> 期間売上総額
+                    </div>
+                    <span id="periodMetaStats" class="text-[10px] text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg font-mono">
+                        0組 / 0名
+                    </span>
+                </div>
+                <div id="periodTotalSales" class="text-3xl font-mono font-black text-emerald-400 tracking-tight">¥0</div>
+            </div>
+
+            <!-- 支払方法の内訳 (現金・カード・売掛) -->
+            <div class="grid grid-cols-3 gap-2">
+                <div class="bg-night-card border border-gray-800/90 p-3 rounded-xl shadow-md text-center">
+                    <div class="text-[10px] font-bold text-gray-400 mb-1">💵 現金売上</div>
+                    <div id="periodCashSales" class="text-xs font-mono font-extrabold text-emerald-300">¥0</div>
+                </div>
+                <div class="bg-night-card border border-gray-800/90 p-3 rounded-xl shadow-md text-center">
+                    <div class="text-[10px] font-bold text-gray-400 mb-1">💳 カード売上</div>
+                    <div id="periodCardSales" class="text-xs font-mono font-extrabold text-sky-300">¥0</div>
+                </div>
+                <div class="bg-night-card border border-gray-800/90 p-3 rounded-xl shadow-md text-center">
+                    <div class="text-[10px] font-bold text-gray-400 mb-1">📝 売掛金</div>
+                    <div id="periodReceivableSales" class="text-xs font-mono font-extrabold text-amber-300">¥0</div>
+                </div>
+            </div>
+
+            <!-- 伝票番号範囲カード -->
+            <div class="bg-night-card border border-gray-800/90 p-3.5 rounded-2xl shadow-md flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                        <i data-lucide="hash" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-gray-200">伝票番号範囲</div>
+                        <div class="text-[10px] text-gray-400">期間内の開始～終了番号</div>
+                    </div>
+                </div>
+                <div id="periodSlipRange" class="text-sm font-mono font-extrabold text-amber-300">なし</div>
+            </div>
+
+            <!-- 日別売上内訳一覧 -->
+            <div class="bg-night-card border border-gray-800/90 rounded-2xl p-4 shadow-xl space-y-3">
+                <div class="text-xs font-bold text-gray-300 flex items-center justify-between border-b border-gray-800 pb-2">
+                    <span class="flex items-center gap-1.5">
+                        <i data-lucide="list-ordered" class="w-4 h-4 text-amber-400"></i> 日別売上内訳
+                    </span>
+                    <span id="periodActiveDaysBadge" class="text-[10px] text-gray-400 font-mono">営業 0日</span>
+                </div>
+                <div id="periodDailyBreakdownList" class="space-y-2 text-xs max-h-64 overflow-y-auto no-scrollbar">
+                    <!-- JS描画 -->
+                </div>
+            </div>
+
+            <!-- 期間売上コピーボタン -->
+            <button type="button" onclick="copyPeriodSummaryToClipboard()" class="w-full bg-night-800 hover:bg-night-700 active:scale-95 border border-gray-700/80 text-gray-200 font-bold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg transition-transform">
+                <i data-lucide="copy" class="w-4 h-4 text-amber-400"></i>
+                <span>期間売上テキストをコピー</span>
+            </button>
+        </section>
+
     </main>
 
     <!-- FOOTER NAV -->
-    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-night-900/95 backdrop-blur-md border-t border-gray-800/80 px-2 py-1 flex justify-around text-[10px]">
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-night-900/95 backdrop-blur-md border-t border-gray-800/80 px-1 py-1 flex justify-around text-[10px]">
         <button type="button" id="nav-slips" onclick="switchTab('slips')" class="flex-1 py-2 flex flex-col items-center gap-1 text-amber-400 font-bold border-b-2 border-amber-400">
             <i data-lucide="receipt" class="w-5 h-5"></i>
             <span>伝票</span>
@@ -564,7 +700,11 @@
         </button>
         <button type="button" id="nav-summary" onclick="switchTab('summary')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-400 hover:text-gray-200">
             <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-            <span>集計・日報</span>
+            <span>日報</span>
+        </button>
+        <button type="button" id="nav-period" onclick="switchTab('period')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-400 hover:text-gray-200">
+            <i data-lucide="calendar-range" class="w-5 h-5"></i>
+            <span>期間売上</span>
         </button>
     </nav>
 
@@ -1051,7 +1191,7 @@
             }
 
             appState.pinCode = newPin;
-            saveLocalStateOnly();
+            saveAppState(appState.currentDate); // クラウドへ即時同期保存
             closePinConfigModal();
             showToast('暗証番号を変更しました');
         }
@@ -1140,7 +1280,7 @@
 
         // タブ切替
         function switchTab(tabName) {
-            ['slips', 'cash', 'boy', 'summary'].forEach(t => {
+            ['slips', 'cash', 'boy', 'summary', 'period'].forEach(t => {
                 const sec = document.getElementById(`tab-${t}`);
                 const btn = document.getElementById(`nav-${t}`);
                 if (sec) sec.classList.toggle('hidden', t !== tabName);
@@ -1152,25 +1292,8 @@
                     }
                 }
             });
-        }
-
-        // 30分刻みの時間プルダウン選択肢を生成
-        function populateTimeSelectOptions(selectElement, selectedValue = '20:00') {
-            if (!selectElement) return;
-            selectElement.innerHTML = '';
-            for (let hour = 0; hour < 24; hour++) {
-                for (let min of [0, 30]) {
-                    const hStr = String(hour).padStart(2, '0');
-                    const mStr = String(min).padStart(2, '0');
-                    const timeVal = `${hStr}:${mStr}`;
-                    const opt = document.createElement('option');
-                    opt.value = timeVal;
-                    opt.textContent = timeVal;
-                    if (timeVal === selectedValue) {
-                        opt.selected = true;
-                    }
-                    selectElement.appendChild(opt);
-                }
+            if (tabName === 'period') {
+                renderPeriodSummary();
             }
         }
 
@@ -2179,138 +2302,372 @@
             renderSlips();
             renderCashTransactions();
             renderSummary();
+            renderPeriodSummary();
         }
 
-        // 日報コピールーチン (iOS 12対応)
-        function copySummaryToClipboard() {
-            var dayData = getCurrentDayData();
-            var slips = (dayData.slips || []).slice().sort(function(a, b) {
-                var numA = parseInt(a.slipNumber, 10) || 0;
-                var numB = parseInt(b.slipNumber, 10) || 0;
-                return numA - numB;
-            });
-            var cashTxs = dayData.cashTransactions || [];
-            var boyLogs = getSortedBoyLogs(dayData.boyWorkLogs);
+        // --- 期間別売上集計機能 (週間・月間・期間指定) ---
+        let currentPeriodType = 'week'; // 'week' | 'month' | 'custom'
 
-            var minNum = Infinity;
-            var maxNum = -Infinity;
-            var totalCustomers = 0;
-            var totalSales = 0;
-            var totalCashSales = 0;
-            var totalCardSales = 0;
-            var totalReceivableSales = 0;
-
-            slips.forEach(function(s) {
-                var num = parseInt(s.slipNumber, 10);
-                if (!isNaN(num)) {
-                    if (num < minNum) minNum = num;
-                    if (num > maxNum) maxNum = num;
-                }
-                totalCustomers += Number(s.customerCount || 0);
-                totalSales += Number(s.totalAmount || 0);
-                totalCashSales += Number(s.cashPayment || 0);
-                totalCardSales += Number(s.cardPayment || 0);
-                totalReceivableSales += Number(s.receivablePayment || 0);
-            });
-
-            var slipRangeStr = (minNum !== Infinity && maxNum !== -Infinity) ? (minNum + '番～' + maxNum + '番') : 'なし';
-
-            var categoryOrder = [
-                '【出金】キャスト日払い',
-                '【出金】ボーイ日払い',
-                '【出金】ボーイバック',
-                '【出金】送り',
-                '【出金】外注',
-                '【出金】その他'
-            ];
-
-            var groupedTxs = {};
-            if (totalCashSales > 0) {
-                groupedTxs['【入金】現金売上'] = [{ memo: '伝票現金合算', amount: totalCashSales, type: 'in' }];
+        // ローカル日付文字列(YYYY-MM-DD)を安全にDateオブジェクトへ変換（時差ズレ防止）
+        function parseLocalDate(ymdStr) {
+            const parts = String(ymdStr || '').split('-').map(Number);
+            if (parts.length !== 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) {
+                return new Date();
             }
-            cashTxs.forEach(function(m) {
-                var groupKey = (m.type === 'in' ? '【入金】' : '【出金】') + (m.category || 'その他');
-                if (!groupedTxs[groupKey]) groupedTxs[groupKey] = [];
-                groupedTxs[groupKey].push(m);
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+
+        // DateオブジェクトをYYYY-MM-DD形式へフォーマット
+        function formatLocalDateYMD(dateObj) {
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // 曜日ラベル付き日付表示 (例: 2026/11/17(火))
+        function formatDateWithWeekday(ymdStr) {
+            const dt = parseLocalDate(ymdStr);
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            const w = weekdays[dt.getDay()];
+            return `${ymdStr.replace(/-/g, '/')}(${w})`;
+        }
+
+        // 基準日を含む週の開始日(月曜)と終了日(日曜)を取得
+        function getWeekBounds(refYmd) {
+            const dt = parseLocalDate(refYmd);
+            const day = dt.getDay(); // 0:日, 1:月 ... 6:土
+            const diffToMonday = (day === 0) ? -6 : (1 - day);
+            const monday = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + diffToMonday);
+            const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+            return {
+                startDate: formatLocalDateYMD(monday),
+                endDate: formatLocalDateYMD(sunday)
+            };
+        }
+
+        // 対象年月(YYYY-MM)の月初と月末を取得
+        function getMonthBounds(ymStr) {
+            const parts = String(ymStr || '').split('-').map(Number);
+            if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+                const now = new Date();
+                const first = new Date(now.getFullYear(), now.getMonth(), 1);
+                const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                return { startDate: formatLocalDateYMD(first), endDate: formatLocalDateYMD(last) };
+            }
+            const first = new Date(parts[0], parts[1] - 1, 1);
+            const last = new Date(parts[0], parts[1], 0);
+            return {
+                startDate: formatLocalDateYMD(first),
+                endDate: formatLocalDateYMD(last)
+            };
+        }
+
+        // 期間集計タブの初期値を本日基準でセット
+        function initPeriodControls(baseYmd) {
+            const base = baseYmd || appState.currentDate || formatLocalDateYMD(new Date());
+            const weekRefEl = document.getElementById('periodWeekRefDate');
+            const monthEl = document.getElementById('periodMonthInput');
+            const startEl = document.getElementById('periodStartDateInput');
+            const endEl = document.getElementById('periodEndDateInput');
+
+            if (weekRefEl && !weekRefEl.value) weekRefEl.value = base;
+            if (monthEl && !monthEl.value) monthEl.value = base.slice(0, 7);
+            if (startEl && !startEl.value) {
+                const wb = getWeekBounds(base);
+                startEl.value = wb.startDate;
+            }
+            if (endEl && !endEl.value) endEl.value = base;
+        }
+
+        // 集計モード切替 ('week' | 'month' | 'custom')
+        function setPeriodType(type) {
+            currentPeriodType = type;
+            ['week', 'month', 'custom'].forEach(t => {
+                const btn = document.getElementById(`periodModeBtn-${t}`);
+                const ctrl = document.getElementById(`periodControl-${t}`);
+                if (btn) {
+                    if (t === type) {
+                        btn.className = 'py-2 rounded-lg text-xs font-extrabold bg-amber-500 text-black shadow transition-all';
+                    } else {
+                        btn.className = 'py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-gray-200 transition-all';
+                    }
+                }
+                if (ctrl) {
+                    ctrl.classList.toggle('hidden', t !== type);
+                }
             });
+            renderPeriodSummary();
+        }
 
-            var sortedGroupEntries = Object.entries ? Object.entries(groupedTxs).sort(function(a, b) {
-                var itemsA = a[1];
-                var itemsB = b[1];
-                var typeA = (itemsA[0] && itemsA[0].type) ? itemsA[0].type : 'out';
-                var typeB = (itemsB[0] && itemsB[0].type) ? itemsB[0].type : 'out';
-                if (typeA === 'in' && typeB !== 'in') return -1;
-                if (typeA !== 'in' && typeB === 'in') return 1;
-                return 0;
-            }) : [];
+        function onPeriodWeekDateChange(val) {
+            if (!val) return;
+            renderPeriodSummary();
+        }
 
-            var cashDetailsLines = [];
-            sortedGroupEntries.forEach(function(entry) {
-                var groupName = entry[0];
-                var items = entry[1];
-                var groupTotal = items.reduce(function(sum, item) { return sum + Number(item.amount || 0); }, 0);
-                var isIn = items[0] && items[0].type === 'in';
-                cashDetailsLines.push(groupName + ' [合計: ' + (isIn ? '+' : '-') + '¥' + groupTotal.toLocaleString() + ']');
-                items.forEach(function(item) {
-                    cashDetailsLines.push('  ・' + (item.memo ? item.memo + ' ' : '') + '¥' + Number(item.amount || 0).toLocaleString());
+        function shiftPeriodWeek(offsetWeeks) {
+            const weekRefEl = document.getElementById('periodWeekRefDate');
+            const currentVal = (weekRefEl && weekRefEl.value) ? weekRefEl.value : (appState.currentDate || formatLocalDateYMD(new Date()));
+            const dt = parseLocalDate(currentVal);
+            dt.setDate(dt.getDate() + offsetWeeks * 7);
+            if (weekRefEl) weekRefEl.value = formatLocalDateYMD(dt);
+            renderPeriodSummary();
+        }
+
+        function onPeriodMonthChange(val) {
+            if (!val) return;
+            renderPeriodSummary();
+        }
+
+        function shiftPeriodMonth(offsetMonths) {
+            const monthEl = document.getElementById('periodMonthInput');
+            const currentYm = (monthEl && monthEl.value) ? monthEl.value : (appState.currentDate || formatLocalDateYMD(new Date())).slice(0, 7);
+            const parts = currentYm.split('-').map(Number);
+            const dt = new Date(parts[0], (parts[1] - 1) + offsetMonths, 1);
+            const nextYm = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+            if (monthEl) monthEl.value = nextYm;
+            renderPeriodSummary();
+        }
+
+        // 現在選択中の期間範囲(startDate, endDate, label)を取得
+        function getActivePeriodRange() {
+            const fallbackDate = appState.currentDate || formatLocalDateYMD(new Date());
+            if (currentPeriodType === 'week') {
+                const refDate = document.getElementById('periodWeekRefDate')?.value || fallbackDate;
+                const bounds = getWeekBounds(refDate);
+                return {
+                    startDate: bounds.startDate,
+                    endDate: bounds.endDate,
+                    label: `${formatDateWithWeekday(bounds.startDate)} ～ ${formatDateWithWeekday(bounds.endDate)}`
+                };
+            } else if (currentPeriodType === 'month') {
+                const ym = document.getElementById('periodMonthInput')?.value || fallbackDate.slice(0, 7);
+                const bounds = getMonthBounds(ym);
+                const parts = ym.split('-');
+                return {
+                    startDate: bounds.startDate,
+                    endDate: bounds.endDate,
+                    label: `${parts[0]}年${Number(parts[1])}月 (${bounds.startDate.replace(/-/g, '/')} ～ ${bounds.endDate.replace(/-/g, '/')})`
+                };
+            } else {
+                let s = document.getElementById('periodStartDateInput')?.value || fallbackDate;
+                let e = document.getElementById('periodEndDateInput')?.value || fallbackDate;
+                if (s > e) {
+                    const tmp = s;
+                    s = e;
+                    e = tmp;
+                }
+                return {
+                    startDate: s,
+                    endDate: e,
+                    label: `${formatDateWithWeekday(s)} ～ ${formatDateWithWeekday(e)}`
+                };
+            }
+        }
+
+        // 指定期間の純売上集計データを計算
+        function calculatePeriodSalesStats(startDate, endDate) {
+            const dailyData = appState.dailyData || {};
+            const matchingDates = Object.keys(dailyData)
+                .filter(d => d >= startDate && d <= endDate)
+                .sort();
+
+            let totalSales = 0;
+            let totalCashSales = 0;
+            let totalCardSales = 0;
+            let totalReceivableSales = 0;
+            let totalGroups = 0;
+            let totalCustomers = 0;
+            let minSlipNum = Infinity;
+            let maxSlipNum = -Infinity;
+            const dailyRows = [];
+
+            matchingDates.forEach(dateKey => {
+                const day = dailyData[dateKey] || {};
+                const slips = day.slips || [];
+                if (slips.length === 0) return;
+
+                let dayTotal = 0;
+                let dayCash = 0;
+                let dayCard = 0;
+                let dayRecv = 0;
+                let dayCustomers = 0;
+                let dayMinSlip = Infinity;
+                let dayMaxSlip = -Infinity;
+
+                slips.forEach(s => {
+                    const amt = Number(s.totalAmount || 0);
+                    const cash = Number(s.cashPayment || 0);
+                    const card = Number(s.cardPayment || 0);
+                    const recv = Number(s.receivablePayment || 0);
+                    const cust = Number(s.customerCount || 0);
+                    const num = parseInt(s.slipNumber, 10);
+
+                    dayTotal += amt;
+                    dayCash += cash;
+                    dayCard += card;
+                    dayRecv += recv;
+                    dayCustomers += cust;
+
+                    if (!isNaN(num)) {
+                        if (num < dayMinSlip) dayMinSlip = num;
+                        if (num > dayMaxSlip) dayMaxSlip = num;
+                        if (num < minSlipNum) minSlipNum = num;
+                        if (num > maxSlipNum) maxSlipNum = num;
+                    }
+                });
+
+                totalSales += dayTotal;
+                totalCashSales += dayCash;
+                totalCardSales += dayCard;
+                totalReceivableSales += dayRecv;
+                totalGroups += slips.length;
+                totalCustomers += dayCustomers;
+
+                const daySlipRange = (dayMinSlip !== Infinity && dayMaxSlip !== -Infinity)
+                    ? `${dayMinSlip}番～${dayMaxSlip}番`
+                    : '-';
+
+                dailyRows.push({
+                    date: dateKey,
+                    slipCount: slips.length,
+                    customers: dayCustomers,
+                    slipRange: daySlipRange,
+                    total: dayTotal,
+                    cash: dayCash,
+                    card: dayCard,
+                    receivable: dayRecv
                 });
             });
 
-            var boyLines = boyLogs.map(function(b) {
-                return '・' + b.name + ': ' + b.startTime + '～' + b.endTime + ' (' + calculateWorkHours(b.startTime, b.endTime) + ')';
-            });
+            const slipRangeStr = (minSlipNum !== Infinity && maxSlipNum !== -Infinity)
+                ? `${minSlipNum}番 ～ ${maxSlipNum}番`
+                : 'なし';
 
-            var totalChampagneBack = 0;
-            var castBackMap = {};
-            slips.forEach(function(s) {
-                (s.champagnes || []).forEach(function(c) {
-                    var cast = c.castName || 'フリー';
-                    var price = Number(c.price) || 0;
-                    var back = Math.floor(price * 0.1);
-                    totalChampagneBack += back;
-                    castBackMap[cast] = (castBackMap[cast] || 0) + back;
-                });
-            });
-            
-            var castBackLines = [];
-            for (var castName in castBackMap) {
-                if (castBackMap.hasOwnProperty(castName)) {
-                    castBackLines.push('・' + castName + ': ¥' + castBackMap[castName].toLocaleString());
+            return {
+                totalSales,
+                totalCashSales,
+                totalCardSales,
+                totalReceivableSales,
+                totalGroups,
+                totalCustomers,
+                slipRangeStr,
+                activeDays: dailyRows.length,
+                dailyRows
+            };
+        }
+
+        // 期間売上画面の描画
+        function renderPeriodSummary() {
+            const range = getActivePeriodRange();
+            const stats = calculatePeriodSalesStats(range.startDate, range.endDate);
+
+            const rangeDisplayEl = document.getElementById('periodRangeDisplay');
+            if (rangeDisplayEl) rangeDisplayEl.textContent = range.label;
+
+            const totalSalesEl = document.getElementById('periodTotalSales');
+            if (totalSalesEl) totalSalesEl.textContent = `¥${stats.totalSales.toLocaleString()}`;
+
+            const metaStatsEl = document.getElementById('periodMetaStats');
+            if (metaStatsEl) metaStatsEl.textContent = `${stats.totalGroups}組 / ${stats.totalCustomers}名`;
+
+            const cashEl = document.getElementById('periodCashSales');
+            if (cashEl) cashEl.textContent = `¥${stats.totalCashSales.toLocaleString()}`;
+
+            const cardEl = document.getElementById('periodCardSales');
+            if (cardEl) cardEl.textContent = `¥${stats.totalCardSales.toLocaleString()}`;
+
+            const recvEl = document.getElementById('periodReceivableSales');
+            if (recvEl) recvEl.textContent = `¥${stats.totalReceivableSales.toLocaleString()}`;
+
+            const slipRangeEl = document.getElementById('periodSlipRange');
+            if (slipRangeEl) slipRangeEl.textContent = stats.slipRangeStr;
+
+            const activeDaysEl = document.getElementById('periodActiveDaysBadge');
+            if (activeDaysEl) activeDaysEl.textContent = `営業 ${stats.activeDays}日`;
+
+            const listEl = document.getElementById('periodDailyBreakdownList');
+            if (listEl) {
+                if (stats.dailyRows.length === 0) {
+                    listEl.innerHTML = '<div class="text-gray-500 text-xs py-3 text-center">対象期間の売上データはありません</div>';
+                } else {
+                    listEl.innerHTML = stats.dailyRows.map(row => `
+                        <div onclick="jumpToDailyReport('${escapeHtml(row.date)}')" class="bg-night-950 p-3 rounded-xl border border-gray-800 hover:border-amber-500/40 active:scale-[0.98] cursor-pointer transition-all space-y-1.5 group">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-mono font-bold text-gray-200 group-hover:text-amber-300 transition-colors">${escapeHtml(formatDateWithWeekday(row.date))}</span>
+                                    <span class="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono">
+                                        ${escapeHtml(row.slipRange)}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="font-mono font-extrabold text-emerald-400 text-sm">¥${row.total.toLocaleString()}</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-500 group-hover:text-amber-400 transition-colors"></i>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-[10px] text-gray-400">
+                                <span>現金: ¥${row.cash.toLocaleString()} / カード: ¥${row.card.toLocaleString()} / 売掛: ¥${row.receivable.toLocaleString()}</span>
+                                <span class="font-mono">${row.slipCount}組 ${row.customers}名</span>
+                            </div>
+                        </div>
+                    `).join('');
                 }
             }
 
-            var cashInTotal = 0;
-            var cashOutTotal = 0;
-            cashTxs.forEach(function(t) {
-                if (t.type === 'in') cashInTotal += Number(t.amount || 0);
-                if (t.type === 'out') cashOutTotal += Number(t.amount || 0);
-            });
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+        }
 
-            var initialCash = dayData.initialCash || 0;
-            var expectedCash = initialCash + totalCashSales + cashInTotal - cashOutTotal - totalChampagneBack;
+        // 日別売上内訳から該当日の日報詳細画面へジャンプ
+        function jumpToDailyReport(dateStr) {
+            if (!dateStr) return;
 
-            var summaryText = '【本日の日報 (' + appState.currentDate + ')】\n';
-            summaryText += '-------------------\n';
-            summaryText += '■ 本日売上総額: ¥' + totalSales.toLocaleString() + '\n';
-            summaryText += '  ・現金売上   : ¥' + totalCashSales.toLocaleString() + '\n';
-            summaryText += '  ・カード売上 : ¥' + totalCardSales.toLocaleString() + '\n';
-            summaryText += '  ・売掛金     : ¥' + totalReceivableSales.toLocaleString() + '\n';
-            summaryText += '-------------------\n';
-            summaryText += '■ レジドロアー現金残: ¥' + expectedCash.toLocaleString() + '\n';
-            summaryText += '  (準備金¥' + initialCash.toLocaleString() + ' + 現金売上¥' + totalCashSales.toLocaleString() + ' + 入金¥' + cashInTotal.toLocaleString() + ' - 出金¥' + cashOutTotal.toLocaleString() + ' - バック¥' + totalChampagneBack.toLocaleString() + ')\n';
-            summaryText += '-------------------\n';
-            summaryText += '■ 伝票番号   : ' + slipRangeStr + '\n';
-            summaryText += '■ 来店組数   : ' + slips.length + '組\n';
-            summaryText += '■ 総客数     : ' + totalCustomers + '名\n';
-            summaryText += '-------------------\n';
-            summaryText += '【入出金明細 (項目別)】\n' + (cashDetailsLines.length > 0 ? cashDetailsLines.join('\n') : '・なし') + '\n';
-            summaryText += '-------------------\n';
-            summaryText += '【シャンパンバック内訳 (10%) - 合計: ¥' + totalChampagneBack.toLocaleString() + '】\n' + (castBackLines.length > 0 ? castBackLines.join('\n') : '・なし') + '\n';
-            summaryText += '-------------------\n';
-            summaryText += '【ボーイ勤務記録】\n' + (boyLines.length > 0 ? boyLines.join('\n') : '・なし') + '\n';
+            const dateInput = document.getElementById('currentDateInput');
+            if (dateInput) {
+                dateInput.value = dateStr;
+            }
 
-            var textArea = document.createElement('textarea');
-            textArea.value = summaryText;
+            const targetDayData = appState.dailyData ? appState.dailyData[dateStr] : null;
+            if (targetDayData && targetDayData.isLocked !== undefined) {
+                appState.isLocked = Boolean(targetDayData.isLocked);
+            }
+
+            onDateChange(dateStr);
+            switchTab('summary');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showToast(`${formatDateWithWeekday(dateStr)} の日報を表示しました`);
+        }
+
+        // 期間売上テキストをクリップボードへコピー
+        function copyPeriodSummaryToClipboard() {
+            const range = getActivePeriodRange();
+            const stats = calculatePeriodSalesStats(range.startDate, range.endDate);
+            const typeLabel = currentPeriodType === 'week' ? '週間売上集計' : (currentPeriodType === 'month' ? '月間売上集計' : '期間指定売上集計');
+
+            let text = `【${typeLabel}】\n`;
+            text += `対象期間: ${range.label}\n`;
+            text += `-------------------\n`;
+            text += `■ 売上総額   : ¥${stats.totalSales.toLocaleString()}\n`;
+            text += `  ・現金売上   : ¥${stats.totalCashSales.toLocaleString()}\n`;
+            text += `  ・カード売上 : ¥${stats.totalCardSales.toLocaleString()}\n`;
+            text += `  ・売掛金     : ¥${stats.totalReceivableSales.toLocaleString()}\n`;
+            text += `-------------------\n`;
+            text += `■ 伝票番号   : ${stats.slipRangeStr}\n`;
+            text += `■ 営業日数   : ${stats.activeDays}日\n`;
+            text += `■ 総組数     : ${stats.totalGroups}組\n`;
+            text += `■ 総客数     : ${stats.totalCustomers}名\n`;
+
+            if (stats.dailyRows.length > 0) {
+                text += `-------------------\n`;
+                text += `【日別内訳】\n`;
+                stats.dailyRows.forEach(r => {
+                    text += `・${formatDateWithWeekday(r.date)} [${r.slipRange}]: ¥${r.total.toLocaleString()} (現¥${r.cash.toLocaleString()} / カ¥${r.card.toLocaleString()} / 掛¥${r.receivable.toLocaleString()})\n`;
+                });
+            }
+
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
             textArea.style.position = 'fixed';
             textArea.style.left = '-9999px';
             textArea.style.top = '-9999px';
@@ -2318,7 +2675,7 @@
             textArea.focus();
             textArea.select();
 
-            var successful = false;
+            let successful = false;
             try {
                 successful = document.execCommand('copy');
             } catch (err) {
@@ -2327,11 +2684,11 @@
             document.body.removeChild(textArea);
 
             if (successful) {
-                showToast('日報用テキストをコピーしました！');
+                showToast('期間売上テキストをコピーしました！');
             } else if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(summaryText).then(function() {
-                    showToast('日報用テキストをコピーしました！');
-                }).catch(function() {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('期間売上テキストをコピーしました！');
+                }).catch(() => {
                     showToast('コピーに失敗しました');
                 });
             } else {
@@ -2394,6 +2751,8 @@
                 }
                 appState.currentDate = dateInput.value;
             }
+
+            initPeriodControls(appState.currentDate);
 
             if (window.lucide && typeof lucide.createIcons === 'function') {
                 lucide.createIcons();
