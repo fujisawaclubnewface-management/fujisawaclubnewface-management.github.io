@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ナイトワーク伝票＆レジ締め管理</title>
+    <title>伝票＆レジ締め管理</title>
     <!-- Tailwind CSS with safe fallback/load for older Safari -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -1826,6 +1826,28 @@
             showToast(`ボーイ「${newName}」を追加しました`);
         }
 
+        // 30分刻みの時間選択肢を生成
+        function populateTimeSelectOptions(selectEl, selectedValue) {
+            if (!selectEl) return;
+            const times = [];
+            // ナイトワーク営業時間帯（17:00〜翌16:30）の30分刻み48枠を生成
+            for (let i = 0; i < 48; i++) {
+                const totalMinutes = (17 * 60 + i * 30) % (24 * 60);
+                const hh = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+                const mm = String(totalMinutes % 60).padStart(2, '0');
+                times.push(`${hh}:${mm}`);
+            }
+            if (selectedValue && !times.includes(selectedValue)) {
+                times.unshift(selectedValue);
+            }
+            selectEl.innerHTML = times
+                .map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`)
+                .join('');
+            if (selectedValue) {
+                selectEl.value = selectedValue;
+            }
+        }
+
         function openBoyWorkModal(logId = null) {
             const modal = document.getElementById('boyWorkModal');
             const select = document.getElementById('boySelect');
@@ -2115,19 +2137,21 @@
             if (window.lucide) lucide.createIcons();
         }
 
-        function renderSummary() {
+        // 日報用テキストをクリップボードへコピー
+        function copySummaryToClipboard() {
             const dayData = getCurrentDayData();
             const slips = dayData.slips || [];
             const cashTxs = dayData.cashTransactions || [];
+            const sortedBoyLogs = getSortedBoyLogs(dayData.boyWorkLogs);
 
             let totalSales = 0;
-            let totalCashSales = 0; 
+            let totalCashSales = 0;
             let totalCardSales = 0;
             let totalReceivableSales = 0;
 
             slips.forEach(s => {
                 totalSales += Number(s.totalAmount || 0);
-                totalCashSales += Number(s.cashPayment || 0); 
+                totalCashSales += Number(s.cashPayment || 0);
                 totalCardSales += Number(s.cardPayment || 0);
                 totalReceivableSales += Number(s.receivablePayment || 0);
             });
@@ -2139,11 +2163,8 @@
                 if (t.type === 'out') cashOut += Number(t.amount || 0);
             });
 
-            // キャスト別シャンパンバック計算 (10%) - expectedCashの計算前に実行
             let totalChampagneBack = 0;
             const castBackMap = {};
-            const castChampagneDetails = {}; // キャストごとの注文内訳
-
             slips.forEach(s => {
                 (s.champagnes || []).forEach(c => {
                     const cast = c.castName || 'フリー';
@@ -2151,148 +2172,179 @@
                     const back = Math.floor(price * 0.1);
                     totalChampagneBack += back;
                     castBackMap[cast] = (castBackMap[cast] || 0) + back;
-
-                    if (!castChampagneDetails[cast]) castChampagneDetails[cast] = [];
-                    castChampagneDetails[cast].push({
-                        brand: c.brandName || 'シャンパン',
-                        price: price,
-                        back: back,
-                        slipNum: s.slipNumber
-                    });
                 });
             });
 
-            const initialCash = dayData.initialCash || 0;
+            const initialCash = Number(dayData.initialCash || 0);
             const expectedCash = initialCash + totalCashSales + cashIn - cashOut - totalChampagneBack;
+            const dateLabel = appState.currentDate ? formatDateWithWeekday(appState.currentDate) : '';
 
-            // UI反映
-            const totalSalesEl = document.getElementById('summaryTotalSales');
-            if (totalSalesEl) totalSalesEl.textContent = `¥${totalSales.toLocaleString()}`;
+            let text = `【営業日報】 ${dateLabel}\n`;
+            text += `-------------------\n`;
+            text += `■ 本日売上総額 : ¥${totalSales.toLocaleString()}\n`;
+            text += `  ・現金売上   : ¥${totalCashSales.toLocaleString()}\n`;
+            text += `  ・カード売上 : ¥${totalCardSales.toLocaleString()}\n`;
+            text += `  ・売掛金     : ¥${totalReceivableSales.toLocaleString()}\n`;
+            text += `-------------------\n`;
+            text += `■ 準備金       : ¥${initialCash.toLocaleString()}\n`;
+            text += `■ 入金計       : ¥${(cashIn + totalCashSales).toLocaleString()}\n`;
+            text += `■ 出金計       : ¥${cashOut.toLocaleString()}\n`;
+            text += `■ シャンパンBK : ¥${totalChampagneBack.toLocaleString()}\n`;
+            text += `■ 理論現金残高 : ¥${expectedCash.toLocaleString()}\n`;
 
-            const cashSalesEl = document.getElementById('summaryCashSales');
-            if (cashSalesEl) cashSalesEl.textContent = `¥${totalCashSales.toLocaleString()}`;
-
-            const cardSalesEl = document.getElementById('summaryCardSales');
-            if (cardSalesEl) cardSalesEl.textContent = `¥${totalCardSales.toLocaleString()}`;
-
-            const recvSalesEl = document.getElementById('summaryReceivableSales');
-            if (recvSalesEl) recvSalesEl.textContent = `¥${totalReceivableSales.toLocaleString()}`;
-
-            const cashInEl = document.getElementById('summaryCashIn');
-            if (cashInEl) cashInEl.textContent = `¥${(cashIn + totalCashSales).toLocaleString()}`;
-
-            const cashOutEl = document.getElementById('summaryCashOut');
-            if (cashOutEl) cashOutEl.textContent = `¥${cashOut.toLocaleString()}`;
-
-            const initialCashEl = document.getElementById('summaryInitialCash');
-            if (initialCashEl) initialCashEl.textContent = `¥${initialCash.toLocaleString()}`;
-
-            const expectedCashEl = document.getElementById('summaryExpectedCash');
-            if (expectedCashEl) expectedCashEl.textContent = `¥${expectedCash.toLocaleString()}`;
-
-            // シャンパンバック総額表示
-            const castBackTotalEl = document.getElementById('summaryCastBackTotal');
-            if (castBackTotalEl) castBackTotalEl.textContent = `総額: ¥${totalChampagneBack.toLocaleString()}`;
-
-            // キャスト別シャンパンバック詳細
-            const castBackListEl = document.getElementById('summaryCastBackList');
-            if (castBackListEl) {
-                const entries = Object.entries(castBackMap);
-                if (entries.length === 0) {
-                    castBackListEl.innerHTML = '<div class="text-gray-500 text-xs py-1">本日のシャンパンバック該当者はありません</div>';
-                } else {
-                    castBackListEl.innerHTML = entries.map(([cast, amt]) => {
-                        const details = castChampagneDetails[cast] || [];
-                        const detailStr = details.map(d => `${d.brand}(¥${d.price.toLocaleString()} → バック¥${d.back.toLocaleString()})`).join(', ');
-                        return `
-                            <div class="bg-night-950 p-2.5 rounded-xl border border-gray-800 space-y-1">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-bold text-gray-200">✨ ${escapeHtml(cast)}</span>
-                                    <span class="font-mono font-extrabold text-amber-400">¥${amt.toLocaleString()}</span>
-                                </div>
-                                <div class="text-[10px] text-gray-400">内訳: ${escapeHtml(detailStr)}</div>
-                            </div>
-                        `;
-                    }).join('');
-                }
+            const backEntries = Object.entries(castBackMap);
+            if (backEntries.length > 0) {
+                text += `-------------------\n`;
+                text += `【シャンパンバック内訳 (10%)】\n`;
+                backEntries.forEach(([cast, amt]) => {
+                    text += `・${cast}: ¥${amt.toLocaleString()}\n`;
+                });
             }
 
-            // 出入金詳細一覧 (項目ごとにグループ化表示)
-            const cashDetailListEl = document.getElementById('summaryCashDetailList');
-            if (cashDetailListEl) {
-                const categoryOrder = [
-                    '【出金】キャスト日払い',
-                    '【出金】ボーイ日払い',
-                    '【出金】ボーイバック',
-                    '【出金】送り',
-                    '【出金】外注',
-                    '【出金】その他'
-                ];
-
-                const grouped = {};
-                if (totalCashSales > 0) {
-                    grouped['【入金】現金売上'] = {
-                        type: 'in',
-                        category: '現金売上',
-                        total: totalCashSales,
-                        items: [{ memo: '伝票からの現金合算', amount: totalCashSales }]
-                    };
-                }
+            if (cashTxs.length > 0) {
+                text += `-------------------\n`;
+                text += `【出入金明細】\n`;
                 cashTxs.forEach(t => {
-                    const groupKey = `${t.type === 'in' ? '【入金】' : '【出金】'}${t.category || 'その他'}`;
-                    if (!grouped[groupKey]) {
-                        grouped[groupKey] = {
-                            type: t.type,
-                            category: t.category || 'その他',
-                            total: 0,
-                            items: []
-                        };
-                    }
-                    grouped[groupKey].total += Number(t.amount || 0);
-                    grouped[groupKey].items.push(t);
+                    const prefix = t.type === 'in' ? '入金' : '出金';
+                    const memoStr = t.memo ? ` (${t.memo})` : '';
+                    text += `・[${prefix}] ${t.category || 'その他'}${memoStr}: ¥${Number(t.amount || 0).toLocaleString()}\n`;
                 });
+            }
 
-                const groupEntries = Object.entries(grouped).sort(([keyA, dataA], [keyB, dataB]) => {
-                    if (dataA.type === 'in' && dataB.type !== 'in') return -1;
-                    if (dataA.type !== 'in' && dataB.type === 'in') return 1;
-                    if (dataA.type === 'in' && dataB.type === 'in') return keyA.localeCompare(keyB);
-                    
-                    const indexA = categoryOrder.indexOf(keyA);
-                    const indexB = categoryOrder.indexOf(keyB);
-                    const posA = indexA !== -1 ? indexA : 999;
-                    const posB = indexB !== -1 ? indexB : 999;
-                    return posA - posB;
+            if (sortedBoyLogs.length > 0) {
+                text += `-------------------\n`;
+                text += `【ボーイ勤務記録】\n`;
+                sortedBoyLogs.forEach(log => {
+                    const duration = calculateWorkHours(log.startTime, log.endTime);
+                    text += `・${log.name}: ${log.startTime || '20:00'} ～ ${log.endTime || '03:00'} (${duration})\n`;
                 });
+            }
 
-                if (groupEntries.length === 0) {
-                    cashDetailListEl.innerHTML = '<div class="text-gray-500 text-xs py-1 text-center">本日の出入金記録はありません</div>';
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            let successful = false;
+            try {
+                successful = document.execCommand('copy');
+            } catch (err) {
+                console.error('execCommand failed', err);
+            }
+            document.body.removeChild(textArea);
+
+            if (successful) {
+                showToast('日報用テキストをコピーしました！');
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('日報用テキストをコピーしました！');
+                }).catch(() => {
+                    showToast('コピーに失敗しました');
+                });
+            } else {
+                showToast('コピー機能に対応していません');
+            }
+        }
+
+        // 日報・集計画面の描画
+        function renderSummary() {
+            const dayData = getCurrentDayData();
+            const slips = dayData.slips || [];
+            const cashTxs = dayData.cashTransactions || [];
+
+            let totalSales = 0;
+            let totalCashSales = 0;
+            let totalCardSales = 0;
+            let totalReceivableSales = 0;
+
+            slips.forEach(s => {
+                totalSales += Number(s.totalAmount || 0);
+                totalCashSales += Number(s.cashPayment || 0);
+                totalCardSales += Number(s.cardPayment || 0);
+                totalReceivableSales += Number(s.receivablePayment || 0);
+            });
+
+            let cashIn = 0;
+            let cashOut = 0;
+            cashTxs.forEach(t => {
+                if (t.type === 'in') cashIn += Number(t.amount || 0);
+                if (t.type === 'out') cashOut += Number(t.amount || 0);
+            });
+
+            let totalChampagneBack = 0;
+            const castBackMap = {};
+            slips.forEach(s => {
+                (s.champagnes || []).forEach(c => {
+                    const cast = c.castName || 'フリー';
+                    const price = Number(c.price) || 0;
+                    const rate = typeof c.backRate === 'number' ? c.backRate : 0.1;
+                    const back = Math.floor(price * rate);
+                    totalChampagneBack += back;
+                    castBackMap[cast] = (castBackMap[cast] || 0) + back;
+                });
+            });
+
+            const initialCash = Number(dayData.initialCash || 0);
+            const expectedCash = initialCash + totalCashSales + cashIn - cashOut - totalChampagneBack;
+
+            const setElText = (id, text) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = text;
+            };
+
+            setElText('summaryTotalSales', `¥${totalSales.toLocaleString()}`);
+            setElText('summaryCashSales', `¥${totalCashSales.toLocaleString()}`);
+            setElText('summaryCardSales', `¥${totalCardSales.toLocaleString()}`);
+            setElText('summaryReceivableSales', `¥${totalReceivableSales.toLocaleString()}`);
+            setElText('summaryInitialCash', `¥${initialCash.toLocaleString()}`);
+            setElText('summaryCashIn', `¥${cashIn.toLocaleString()}`);
+            setElText('summaryCashOut', `¥${cashOut.toLocaleString()}`);
+            setElText('summaryExpectedCash', `¥${expectedCash.toLocaleString()}`);
+            setElText('summaryCastBackTotal', `総額: ¥${totalChampagneBack.toLocaleString()}`);
+
+            const castBackListEl = document.getElementById('summaryCastBackList');
+            if (castBackListEl) {
+                const backEntries = Object.entries(castBackMap);
+                if (backEntries.length === 0) {
+                    castBackListEl.innerHTML = '<div class="text-gray-500 text-xs py-2 text-center">シャンパンバック対象はありません</div>';
                 } else {
-                    cashDetailListEl.innerHTML = groupEntries.map(([groupName, groupData]) => `
-                        <div class="bg-night-950 p-2.5 rounded-xl border border-gray-800 space-y-1.5">
-                            <div class="flex justify-between items-center border-b border-gray-800/80 pb-1">
-                                <span class="font-bold text-xs ${groupData.type === 'in' ? 'text-emerald-300' : 'text-amber-300'}">
-                                    ${escapeHtml(groupName)}
-                                </span>
-                                <span class="font-mono font-extrabold text-xs ${groupData.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}">
-                                    合計: ${groupData.type === 'in' ? '+' : '-'}¥${groupData.total.toLocaleString()}
-                                </span>
-                            </div>
-                            <div class="space-y-1 pl-1">
-                                ${groupData.items.map(i => `
-                                    <div class="flex justify-between text-[11px] text-gray-400">
-                                        <span>・${i.memo ? escapeHtml(i.memo) : '(メモなし)'}</span>
-                                        <span class="font-mono font-bold ${groupData.type === 'in' ? 'text-emerald-400/80' : 'text-rose-400/80'}">
-                                            ¥${Number(i.amount || 0).toLocaleString()}
-                                        </span>
-                                    </div>
-                                `).join('')}
-                            </div>
+                    castBackListEl.innerHTML = backEntries.map(([cast, amt]) => `
+                        <div class="flex justify-between items-center bg-night-950/70 px-3 py-2 rounded-xl border border-gray-800/80">
+                            <span class="font-bold text-gray-200">${escapeHtml(cast)}</span>
+                            <span class="font-mono font-extrabold text-amber-300">¥${amt.toLocaleString()}</span>
                         </div>
                     `).join('');
                 }
             }
 
-            if (window.lucide) lucide.createIcons();
+            const cashDetailListEl = document.getElementById('summaryCashDetailList');
+            if (cashDetailListEl) {
+                if (cashTxs.length === 0) {
+                    cashDetailListEl.innerHTML = '<div class="text-gray-500 text-xs py-2 text-center">本日の出入金明細はありません</div>';
+                } else {
+                    cashDetailListEl.innerHTML = cashTxs.map(t => {
+                        const isIn = t.type === 'in';
+                        return `
+                            <div class="flex justify-between items-center bg-night-950/70 px-3 py-2 rounded-xl border border-gray-800/80">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${isIn ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+                                        ${isIn ? '入金' : '出金'}
+                                    </span>
+                                    <span class="font-bold text-gray-200 shrink-0">${escapeHtml(t.category || 'その他')}</span>
+                                    ${t.memo ? `<span class="text-gray-400 truncate">- ${escapeHtml(t.memo)}</span>` : ''}
+                                </div>
+                                <span class="font-mono font-extrabold shrink-0 ml-2 ${isIn ? 'text-emerald-400' : 'text-rose-400'}">
+                                    ${isIn ? '+' : '-'}¥${Number(t.amount || 0).toLocaleString()}
+                                </span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
         }
 
         // 全体リフレッシュ
